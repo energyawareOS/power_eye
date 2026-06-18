@@ -18,13 +18,11 @@ double energy_cpu, power_cpu, energy_dram, power_dram;
 static int
 open_powercap(const char *path)
 {
-    int fd;
-
-    fd = open(path, O_RDONLY);
+    int fd = open(path, O_RDONLY);
     if (fd < 0) {
         char *errmsg;
-        asprintf(&errmsg, "failed to open %s", path);
-        perror(errmsg);
+        if (asprintf(&errmsg, "failed to open %s", path) > 0)
+            perror(errmsg);
         exit(EXIT_FAILURE);
     }
     return fd;
@@ -40,15 +38,18 @@ static int
 open_powercap_pkg0_dram_energy(void)
 {
     for (int i = 0;; i++) {
-        int fd;
         char *path, name[64];
 
-        asprintf(&path, "/sys/class/powercap/intel-rapl:0:%d/name", i);
-        fd = open_powercap(path);
-        read(fd, name, sizeof name);
+        if (asprintf(&path, "/sys/class/powercap/intel-rapl:0:%d/name", i) < 0)
+            return -1;
+        int fd = open_powercap(path);
+        int ret = read(fd, name, sizeof name);
         free(path);
+        if (ret <= 0)
+            return -1;
         if (strncmp(name, "dram", 4) == 0) {
-            asprintf(&path, "/sys/class/powercap/intel-rapl:0:%d/energy_uj", i);
+            if (asprintf(&path, "/sys/class/powercap/intel-rapl:0:%d/energy_uj", i) < 0)
+                return -1;
             fd = open_powercap(path);
             free(path);
             return fd;

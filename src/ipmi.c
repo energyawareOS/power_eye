@@ -26,8 +26,7 @@ extern int interval;
 static int
 do_init_ipmi()
 {
-    const char *device_paths[] = {"/dev/ipmi0", "/dev/ipmi/0", "/dev/ipmidev/0",
-                                  NULL};
+    const char *device_paths[] = {"/dev/ipmi0", "/dev/ipmi/0", "/dev/ipmidev/0", NULL};
 
     for (int i = 0; device_paths[i] != NULL; i++) {
         ipmi_ctx.fd = open(device_paths[i], O_RDWR);

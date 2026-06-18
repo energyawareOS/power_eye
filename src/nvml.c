@@ -1,20 +1,25 @@
-#ifndef NO_NVML
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
+
+int use_gpu = 0, per_gpu_output = 0;
+
+unsigned int gpu_count;
+double total_gpu_power, total_gpu_energy;
+
+#ifndef NO_NVML
 #include <nvml.h>
 
 extern unsigned long interval;
 extern int has_energy;
 
-int use_gpu = 0, per_gpu_output = 0;
-static unsigned int gpu_count;
-static nvmlDevice_t *gpu_handles;
-static unsigned int *gpu_powers;
+static int no_nvml;
+
+nvmlDevice_t *gpu_handles;
+unsigned int *gpu_powers;
 static double *gpu_energies;
 
-static double total_gpu_power, total_gpu_energy;
+#endif
 
 void
 print_gpu_headers(void)
@@ -35,11 +40,13 @@ print_gpu_headers(void)
 #endif
 }
 
-static void
-read_energy_gpu(double *p_total_power, double *p_total_energy)
+#ifndef NO_NVML
+
+void
+monitor_gpu_energy(void)
 {
-    *p_total_power = 0;
-    *p_total_energy = 0;
+    total_gpu_power = 0.0;
+    total_gpu_energy = 0.0;
 
     for (unsigned int i = 0; i < gpu_count; i++) {
         unsigned int power_mw;
@@ -48,19 +55,17 @@ read_energy_gpu(double *p_total_power, double *p_total_energy)
                 gpu_energies[i] = (gpu_powers[i] + power_mw) / 1000.0 *
                                   (double)interval / 1000000.0 / 2;
             gpu_powers[i] = power_mw;
-            *p_total_power += (power_mw / 1000.0);
-            *p_total_energy += gpu_energies[i];
+            total_gpu_power += (power_mw / 1000.0);
+            total_gpu_energy += gpu_energies[i];
         }
     }
 }
 
 void
-monitor_gpu_energy()
+report_gpu_energy(void)
 {
     if (!use_gpu)
         return;
-
-    read_energy_gpu(&total_gpu_power, &total_gpu_energy);
 
     printf(" %.3f", total_gpu_power);
     if (has_energy)
@@ -78,11 +83,13 @@ monitor_gpu_energy()
 void
 init_nvml(void)
 {
-    if (!use_gpu)
-        return;
-
-    if (nvmlInit_v2() != NVML_SUCCESS) {
-        fprintf(stderr, "NVML init failed\n");
+    const int err = nvmlInit_v2();
+    if (err != NVML_SUCCESS) {
+        if (err == NVML_ERROR_NOT_SUPPORTED) {
+            no_nvml = 1;
+            return;
+        }
+        fprintf(stderr, "NVML init failed: %d\n", err);
         exit(EXIT_FAILURE);
     }
     if (nvmlDeviceGetCount_v2(&gpu_count) != NVML_SUCCESS || gpu_count == 0) {
@@ -109,9 +116,6 @@ init_nvml(void)
 void
 fini_nvml(void)
 {
-    if (!use_gpu)
-        return;
-
     if (gpu_handles) {
         free(gpu_handles);
         gpu_handles = NULL;
@@ -124,11 +128,11 @@ fini_nvml(void)
 void init_nvml(void) {}
 void fini_nvml(void) {}
 void monitor_gpu_energy(void) {}
+void report_gpu_energy(void) {}
 
 #endif
 
 void
 start_gpu_monitor()
 {
-
 }

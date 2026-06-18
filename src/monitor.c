@@ -21,6 +21,7 @@ extern void print_headers(void);
 extern void start_powercap_monitor(void);
 extern void monitor_powercap_energy(void);
 extern void monitor_cpu_usages(void);
+extern void monitor_gpu_usages(void);
 extern void monitor_ipmi(void);
 extern void start_gpu_monitor(void);
 
@@ -47,6 +48,7 @@ monitor_energy(void)
 
         monitor_powercap_energy();
         monitor_cpu_usages();
+        monitor_gpu_usages();
         monitor_ipmi();
         monitor_gpu_energy();
 

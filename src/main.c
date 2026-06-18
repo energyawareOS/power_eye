@@ -7,6 +7,8 @@
 
 extern void init_cpu_usage(void);
 extern void fini_cpu_usage(void);
+extern void init_gpu_usage(void);
+extern void fini_gpu_usage(void);
 extern void init_powercap(void);
 extern void fini_powercap(void);
 extern void init_nvml(void);
@@ -18,11 +20,8 @@ extern void monitor_energy(void);
 
 extern void add_proc_usage(pid_t pid);
 
-#ifndef NO_NVML
 extern int use_gpu;
 extern int per_gpu_output;
-#endif
-
 extern int use_ipmi;
 
 static void
@@ -61,6 +60,13 @@ parse_field_options(const char *optarg)
         case 'c':
             has_cpu_field = 1;
             break;
+        case 'g':
+            use_gpu = 1;
+            break;
+        case 'G':
+            use_gpu = 1;
+            per_gpu_output = 1;
+            break;
         case 'E':
             has_energy = 1;
             break;
@@ -79,7 +85,7 @@ parse_args(int argc, char *argv[])
 {
     int c;
 
-    while ((c = getopt(argc, argv, "i:t:f:dhIp:gG")) != -1) {
+    while ((c = getopt(argc, argv, "i:t:f:dhIp:")) != -1) {
         switch (c) {
         case 'i':
             interval = strtoul(optarg, NULL, 10) * 1000000;
@@ -107,15 +113,6 @@ parse_args(int argc, char *argv[])
         case 'p':
             add_proc_usage((pid_t)strtoul(optarg, NULL, 10));
             break;
-#ifndef NO_NVML
-        case 'g':
-            use_gpu = 1;
-            break;
-        case 'G':
-            use_gpu = 1;
-            per_gpu_output = 1;
-            break;
-#endif
         default:
             usage();
             exit(EXIT_FAILURE);
@@ -131,11 +128,13 @@ main(const int argc, char *argv[])
     init_cpu_usage();
     init_powercap();
     init_nvml();
+    init_gpu_usage();
     init_ipmi();
 
     monitor_energy();
 
     fini_ipmi();
+    fini_gpu_usage();
     fini_nvml();
     fini_powercap();
     fini_cpu_usage();

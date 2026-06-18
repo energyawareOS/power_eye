@@ -1,21 +1,22 @@
 # PowerEye
 
-`PowerEye` is a lightweight command-line utility for measuring power consumption using Intel's RAPL (Running Average Power Limit) interface.
+`PowerEye` is a lightweight command-line utility for measuring power consumption using Intel's RAPL (Running Average Power Limit) interface, with optional NVIDIA GPU (NVML) and IPMI sources.
 It is implemented in C and built with CMake.
 
 ## Features
 
 - CPU package power & energy via Intel RAPL
 - Optional DRAM domain power & energy (`-d`)
-- Optional GPU total and per-GPU power & energy via NVIDIA NVML (`-g`, `-G`)
+- Optional system-wide power via IPMI (`-I`)
+- Optional GPU total and per-GPU power & energy via NVIDIA NVML (`-f g`, `-f G`)
+- Per-process attribution (`-p <pid>`): CPU energy is split by each pid's CPU utilization, and GPU energy is split by each pid's `nvmlDeviceGetProcessUtilization` SM utilization, weighted by per-device power on multi-GPU systems
 
 ## Requirements
 
-- **OS:** Linux with `/sys/class/powercap` (RAPL) support. You may need to have root privileges.
-- **OS:** Linux with `/sys/class/powercap` (RAPL) support. You may need to have root privileges.
-- **CPU:** Intel processor with RAPL package—and optionally DRAM—domains  
-- **GPU (optional):** NVIDIA driver + NVML (`libnvidia-ml.so`) if using `-g`/`-G`  
-- **Permissions:** Reading `energy_uj` may require `sudo` on some systems
+- **OS:** Linux with `/sys/class/powercap` (RAPL) support. Reading `energy_uj` may require root or a udev rule.
+- **CPU:** Intel processor with RAPL package—and optionally DRAM—domains
+- **GPU (optional):** NVIDIA driver + NVML (`libnvidia-ml.so`) if using `-f g`/`-f G`
+- **IPMI (optional):** `ipmitool` accessible on PATH if using `-I`
 
 ## Build Instructions
 
@@ -30,81 +31,109 @@ cmake --build build
 
 After building, the executable will be available at `build/power_eye`.
 
-## Building
+### Build variants
 
-- CPU-only
+- CPU-only (no NVML dependency)
 
 ```bash
-cmake -B build \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_C_FLAGS="-I/usr/local/cuda/include" \
-  -DCMAKE_EXE_LINKER_FLAGS="-L/usr/lib/x86_64-linux-gnu -lnvidia-ml"
+cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ```
 
-Adjust include/lib paths for your distribution (e.g., `/usr/lib`, `/lib/x86_64-linux-gnu`, `/usr/local/cuda/lib64`).
-
-- NVML-enabled build (includ GPU)
+- NVML-enabled build (adds GPU monitoring)
 
 ```bash
 cmake -B build -DUSE_NVML=ON -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ```
 
+`USE_NVML=ON` requires the CUDA toolkit's `nvml` headers/library. Adjust include/lib paths for your distribution if CMake cannot find them (e.g., `/usr/local/cuda/include`, `/usr/local/cuda/lib64`).
+
 ## Usage
 
 ```bash
-./power_eye [-i <interval>] [-t <timeout>] [-d] [-D] [-E] [-H] [-h] [-g] [-G]
+./power_eye [-i <interval>] [-t <timeout>] [-d] [-I] [-p <pid>]... [-f <specs>] [-h]
 ```
-- `-i <interval>`: Interval in seconds between power measurements (default: 1 second)
-- `-t <timeout>`: Timeout in seconds after which the program exits (default: 120 seconds)
-- `-d`: Enable DRAM power/energy (if DRAM RAPL domain exists)
-- `-D`: Prepend MM-DD to the timestamp (otherwise HH:MM:SS)
-- `-E`: Include energy(J) fields in output (otherwise power only)
-- `-H`: Print a one-line header describing the output columns
-- `-h`: Show help and exit
+
+Options:
+- `-i <interval>`: Sampling interval in seconds (default: 1)
+- `-t <timeout>`: Total measurement duration in seconds (default: 120)
+- `-d`: Enable DRAM power/energy (if the DRAM RAPL domain exists)
+- `-I`: Enable IPMI power measurement
+- `-p <pid>`: Monitor a specific process by PID. May be given multiple times.
+- `-f <specs>`: Field/output specs. `<specs>` is a string of letters (e.g. `-f cEH`):
+  - `d`: Prepend `MM-dd` to the timestamp
+  - `c`: Include CPU power/energy columns
+  - `g`: Include GPU total power/energy columns (requires `USE_NVML=ON`)
+  - `G`: Include per-GPU columns; implies `g`
+  - `E`: Include energy `(J)` columns in addition to power `(W)`
+  - `H`: Print a one-line header describing the output columns
 - `-h`: Show help and exit
 
-GPU (requires NVML and a build with USE_NVML=ON):
-- `-g`: Enable GPU power/energy measurement via NVML
-- `-G`: Also print per-GPU metrics(implies -g)
-
-## Output Schema 
+## Output Schema
 
 **Timestamp**
 - Default: `HH:MM:SS`
-- With `-D`: `MM-DD HH:MM:SS`
+- With `-f d`: `MM-DD HH:MM:SS`
 
 **Columns (by flags)**
 
-- **Base (CPU only, no `-E`):**
+- **CPU only (`-f c`):**
     ```text
     [time] CPU(W)
     ```
 
-- **CPU with energy (`-E`):**
+- **CPU with energy (`-f cE`):**
     ```text
     [time] CPU(W) CPU(J)
     ```
 
-- **CPU + DRAM (`-d`, no `-E`):**
+- **CPU + DRAM (`-d -f c`):**
     ```text
     [time] CPU(W) DRAM(W)
     ```
 
-- **CPU + DRAM with energy (`-d -E`):**
+- **CPU + DRAM with energy (`-d -f cE`):**
     ```text
     [time] CPU(W) CPU(J) DRAM(W) DRAM(J)
     ```
 
-- **Add GPU total (`-g`):**
+- **Add GPU total (`-f cg`):**
     ```text
-    [time] ... GPU(W) [GPU(J) if -E]
+    [time] CPU(W) GPU(W) [GPU(J) if E]
     ```
 
-- **Add per-GPU (`-G`):**
+- **Add per-GPU (`-f cG`):**
     ```text
-    [time] ... GPU(W) [GPU(J)] GPU00(W) [GPU00(J)] GPU01(W) [GPU01(J)] ...
+    [time] CPU(W) GPU(W) [GPU(J)] GPU00(W) [GPU00(J)] GPU01(W) [GPU01(J)] ...
+    ```
+
+- **Per-process attribution (`-p <pid>`):**
+  Per-pid columns are appended at the end. Without GPU, each pid contributes one (or two with `E`) columns:
+    ```text
+    ... PID<n>(W) [PID<n>(J)] ...
+    ```
+  With GPU enabled (`-f g` or `-f G`), each pid contributes CPU and GPU columns:
+    ```text
+    ... PID<n>-CPU(W) [PID<n>-CPU(J)] PID<n>-GPU(W) [PID<n>-GPU(J)] ...
+    ```
+  Per-pid GPU values are derived from `nvmlDeviceGetProcessUtilization` SM samples and are proportional to the total GPU power/energy across all NVIDIA devices.
+
+## Examples
+
+- CPU power, with energy and header, sampled every 1s for 30s:
+    ```bash
+    ./power_eye -t 30 -f cEH
+    ```
+
+- CPU + DRAM + GPU per-device, with energy and header:
+    ```bash
+    ./power_eye -d -t 60 -f cGEH
+    ```
+
+- Per-process CPU/GPU attribution for two pids:
+    ```bash
+    ./power_eye -p 1234 -p 5678 -t 60 -f cgEH
     ```
 
 ## License
@@ -125,21 +154,25 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 - **DRAM flag (`-d`)**
   - If your system lacks a DRAM RAPL domain, using `-d` will fail. Omit `-d` in that case.
 
-- **GPU measurement (`-g`, `-G`)**
-  - Requires NVIDIA driver + NVML (`libnvidia-ml.so` and a build **with** `-DUSE_NVML=ON`).
-  - `-G` includes per-GPU metrics and implies `-g`.
-  - If NVML isn’t available or no NVIDIA GPUs are present, GPU measurement will not work.
+- **GPU measurement (`-f g`, `-f G`)**
+  - Requires NVIDIA driver + NVML (`libnvidia-ml.so`) and a build with `-DUSE_NVML=ON`.
+  - `-f G` includes per-GPU metrics and implies `-f g`.
+  - If NVML isn't available or no NVIDIA GPUs are present, GPU measurement will not work.
+
+- **Per-process measurement (`-p <pid>`)**
+  - CPU energy per pid is proportional to the pid's CPU time delta over the interval (from `/proc/<pid>/stat`).
+  - GPU energy per pid is proportional to its average `smUtil` from `nvmlDeviceGetProcessUtilization`. On multi-GPU systems, each device's contribution is weighted by that device's current power so a pid using only one GPU is not credited for power drawn by idle GPUs.
+  - The pid must be visible to the user running `power_eye`. NVML process utilization may require the same user/permissions as the GPU process.
 
 - **Timing & alignment**
-  - Using absolute time scheduling, sampling is aligned to second-of-minute boundaries. 
-  - By this, timing alignment is consistent for running
+  - Using absolute time scheduling, sampling is aligned to second-of-minute boundaries, keeping timing consistent across runs.
 
 - **Units & fields**
   - Power is in **watts (W)** and energy in **joules (J)**.
-  - Use `-E` to include energy columns; `-H` prints a header row; `-D` adds `MM-DD` to the timestamp.
+  - Use `-f E` to include energy columns; `-f H` prints a header row; `-f d` adds `MM-DD` to the timestamp.
 
 - **Accuracy considerations**
-  - CPU energy uses RAPL counters (platform-estimated). GPU energy is trapezoid-integrated from instantaneous NVML power.
+  - CPU energy uses RAPL counters (platform-estimated). GPU energy is trapezoid-integrated from instantaneous NVML power readings.
   - Shorter intervals generally improve integration accuracy but increase overhead.
 
 - **Containers/VMs**

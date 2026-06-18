@@ -3,6 +3,7 @@
     <words>
       <w>nvml</w>
       <w>powercap</w>
+      <w>rapl</w>
       <w>timebuf</w>
     </words>
   </dictionary>

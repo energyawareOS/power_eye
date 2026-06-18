@@ -21,9 +21,10 @@ get_total_cpu_time(void)
     if (fp == NULL)
         return 0;
 
-    fgets(line, sizeof(line), fp);
+    char *ret = fgets(line, sizeof(line), fp);
     fclose(fp);
-
+    if (ret == NULL)
+        return 0;
     unsigned long long user, nice, system, idle;
     unsigned long long iowait, irq, softirq, steal;
     unsigned long long guest, guest_nice;
@@ -40,7 +41,7 @@ get_total_cpu_time(void)
 }
 
 static unsigned long long
-get_process_cpu_time(pid_t pid)
+get_process_cpu_time(const pid_t pid)
 {
     char path[64];
     snprintf(path, sizeof(path), "/proc/%d/stat", pid);
@@ -50,8 +51,10 @@ get_process_cpu_time(pid_t pid)
         return 0;
 
     char buf[4096];
-    fgets(buf, sizeof(buf), fp);
+    char *ret = fgets(buf, sizeof(buf), fp);
     fclose(fp);
+    if (ret == NULL)
+        return 0;
 
     char *ptr = strrchr(buf, ')');
     if (!ptr)
