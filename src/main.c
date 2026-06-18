@@ -5,6 +5,8 @@
 
 #include "config.h"
 
+extern void init_cpu_usage(void);
+extern void fini_cpu_usage(void);
 extern void init_powercap(void);
 extern void fini_powercap(void);
 extern void init_nvml(void);
@@ -13,6 +15,8 @@ extern void init_ipmi(void);
 extern void fini_ipmi(void);
 
 extern void monitor_energy(void);
+
+extern void add_proc_usage(pid_t pid);
 
 #ifndef NO_NVML
 extern int use_gpu;
@@ -25,16 +29,20 @@ static void
 usage(void)
 {
     printf(
-        "Usage: power_eye [-i interval] [-t timeout] [-h]\n"
+        "Usage: power_eye <options>\n"
         "Options:\n"
         "  -i <interval>  Sampling interval in seconds (default: 1 second)\n"
         "  -t <timeout>   Total measurement duration in seconds (default: 120 seconds)\n"
         "  -d             Enable DRAM power measurement\n"
-        "  -D             Show MM-dd field in outputs\n"
-        "  -E             Show energy field in outputs\n"
-        "  -H             Show field headers in outputs\n"
         "  -h             Show this help message and exit\n"
         "  -I             Enable IPMI power measurement\n"
+        "  -p <pid>       Monitor a specific process by PID\n"
+        "  -f <field specs>\n"
+        "     t: HH:MM:ss\n"
+        "     d: MM-dd\n"
+        "     c: CPU power\n"
+        "     E: Show energy field in outputs\n"
+        "     H: Show field headers in outputs\n"
 #ifndef NO_NVML
         "  -g             Enable GPU power measurement\n"
         "  -G             Show all powers of GPU devices\n"
@@ -43,11 +51,35 @@ usage(void)
 }
 
 static void
+parse_field_options(const char *optarg)
+{
+    for (const char *p = optarg; *p != '\0'; p++) {
+        switch (*p) {
+        case 'd':
+            has_mmdd = 1;
+            break;
+        case 'c':
+            has_cpu_field = 1;
+            break;
+        case 'E':
+            has_energy = 1;
+            break;
+        case 'H':
+            has_headers = 1;
+            break;
+        default:
+            fprintf(stderr, "Unknown field option: %c\n", *p);
+            exit(EXIT_FAILURE);
+        }
+    }
+}
+
+static void
 parse_args(int argc, char *argv[])
 {
     int c;
 
-    while ((c = getopt(argc, argv, "i:t:dDEHhIgG")) != -1) {
+    while ((c = getopt(argc, argv, "i:t:f:dhIp:gG")) != -1) {
         switch (c) {
         case 'i':
             interval = strtoul(optarg, NULL, 10) * 1000000;
@@ -62,14 +94,8 @@ parse_args(int argc, char *argv[])
         case 'd':
             has_dram = 1;
             break;
-        case 'D':
-            has_mmdd = 1;
-            break;
-        case 'E':
-            has_energy = 1;
-            break;
-        case 'H':
-            has_headers = 1;
+        case 'f':
+            parse_field_options(optarg);
             break;
         case 'h':
             usage();
@@ -77,6 +103,9 @@ parse_args(int argc, char *argv[])
         case 'I':
             use_ipmi = 1;
             init_ipmi();
+            break;
+        case 'p':
+            add_proc_usage((pid_t)strtoul(optarg, NULL, 10));
             break;
 #ifndef NO_NVML
         case 'g':
@@ -95,10 +124,11 @@ parse_args(int argc, char *argv[])
 }
 
 int
-main(int argc, char *argv[])
+main(const int argc, char *argv[])
 {
     parse_args(argc, argv);
 
+    init_cpu_usage();
     init_powercap();
     init_nvml();
     init_ipmi();
@@ -108,6 +138,7 @@ main(int argc, char *argv[])
     fini_ipmi();
     fini_nvml();
     fini_powercap();
+    fini_cpu_usage();
 
     return 0;
 }

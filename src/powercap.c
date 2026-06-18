@@ -13,6 +13,8 @@ static int fd_cpu, fd_cpu_dram = -1;
 extern int has_dram;
 static double acc_energy_last_cpu, acc_energy_last_dram;
 
+double energy_cpu, power_cpu, energy_dram, power_dram;
+
 static int
 open_powercap(const char *path)
 {
@@ -74,13 +76,15 @@ fini_powercap(void)
 void
 print_powercap_headers()
 {
-    printf(" CPU(W)");
-    if (has_energy)
-        printf(" CPU(J)");
-    if (has_dram) {
-        printf(" DRAM(W)");
+    if (has_cpu_field) {
+        printf(" CPU(W)");
         if (has_energy)
-            printf(" DRAM(J)");
+            printf(" CPU(J)");
+        if (has_dram) {
+            printf(" DRAM(W)");
+            if (has_energy)
+                printf(" DRAM(J)");
+        }
     }
 }
 
@@ -122,13 +126,17 @@ start_powercap_monitor()
 void
 monitor_powercap_energy(void)
 {
-    double energy_cpu, power_cpu, energy_dram, power_dram;
-
     read_power_energy(fd_cpu, &power_cpu, &energy_cpu, &acc_energy_last_cpu);
     if (fd_cpu_dram >= 0)
         read_power_energy(fd_cpu_dram, &power_dram, &energy_dram,
                           &acc_energy_last_dram);
+}
 
+void
+report_powercap_energy(void)
+{
+    if (!has_cpu_field)
+        return;
     printf("%.3f", power_cpu);
     if (has_energy)
         printf(" %.3f", energy_cpu);

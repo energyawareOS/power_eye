@@ -3,6 +3,7 @@
 
 extern unsigned long interval;
 extern unsigned int timeout;
+extern int has_cpu_field;
 extern int has_dram;
 extern int has_mmdd;
 extern int has_energy;

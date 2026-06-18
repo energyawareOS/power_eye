@@ -2,6 +2,8 @@
   <dictionary name="project">
     <words>
       <w>nvml</w>
+      <w>powercap</w>
+      <w>timebuf</w>
     </words>
   </dictionary>
 </component>

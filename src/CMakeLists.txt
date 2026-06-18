@@ -6,6 +6,9 @@ set(SRC_FILES
         powercap.c
         timeutil.c
         report.c
+        cpu_usage.c
+        proc_usage.c
+        proc_usage.h
 )
 
 add_executable(power_eye ${SRC_FILES})

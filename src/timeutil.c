@@ -3,30 +3,38 @@
 #include <stdint.h>
 #include <unistd.h>
 
+struct timespec ts_real, ts_start, ts_next;
+
 extern int has_mmdd;
 extern int interval;
 extern int timeout;
 
-static void
-setup_current_time_str(char *timebuf)
+static inline void
+timespec_add_us(struct timespec *ts, const long usec)
 {
-    time_t now = time(NULL);
+    ts->tv_sec += usec / 1000000;
+    ts->tv_nsec += (usec % 1000000) * 1000;
+
+    // 나노초가 1초를 넘어가면 초(sec)로 올림 처리
+    if (ts->tv_nsec >= 1000000000) {
+        ts->tv_sec += 1;
+        ts->tv_nsec -= 1000000000;
+    }
+}
+
+const char *
+get_current_time_str(void)
+{
+    static char timebuf[32];
     struct tm tm_now;
-    localtime_r(&now, &tm_now);
+
+    localtime_r(&ts_real.tv_sec, &tm_now);
 
     if (has_mmdd)
         strftime(timebuf, 32, "%m-%d %H:%M:%S", &tm_now);
     else
         strftime(timebuf, 32, "%H:%M:%S", &tm_now);
-}
-
-void
-show_current_time(void)
-{
-    char timebuf[32];
-
-    setup_current_time_str(timebuf);
-    printf("%s ", timebuf);
+    return timebuf;
 }
 
 void
@@ -47,8 +55,6 @@ wait_until_aligned_interval(void)
         usleep(total_wait);
 }
 
-struct timespec ts_start, ts_next;
-
 static inline uint64_t
 get_usec_elapsed(struct timespec *start, struct timespec *end)
 {
@@ -65,6 +71,7 @@ get_usec_elapsed(struct timespec *start, struct timespec *end)
 void
 timestamp_start(void)
 {
+    clock_gettime(CLOCK_REALTIME, &ts_real);
     clock_gettime(CLOCK_MONOTONIC, &ts_start);
     ts_next = ts_start;
 }
@@ -77,12 +84,11 @@ timestamp_sleep(void)
     if (elapsed_from_start >= timeout * 1000000)
         return 1;
 
-    ts_next.tv_sec += interval / 1000000;
-    ts_next.tv_nsec += (interval % 1000000) * 1000;
-    if (ts_next.tv_nsec >= 1000000000) {
-        ts_next.tv_sec += 1;
-        ts_next.tv_nsec -= 1000000000;
-    }
+    timespec_add_us(&ts_next, interval);
+
     clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &ts_next, NULL);
+
+    timespec_add_us(&ts_real, interval);
+
     return 0;
 }

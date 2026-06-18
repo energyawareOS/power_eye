@@ -14,6 +14,8 @@ static nvmlDevice_t *gpu_handles;
 static unsigned int *gpu_powers;
 static double *gpu_energies;
 
+static double total_gpu_power, total_gpu_energy;
+
 void
 print_gpu_headers(void)
 {
@@ -55,21 +57,20 @@ read_energy_gpu(double *p_total_power, double *p_total_energy)
 void
 monitor_gpu_energy()
 {
-    if (use_gpu) {
-        double total_power, total_energy;
+    if (!use_gpu)
+        return;
 
-        read_energy_gpu(&total_power, &total_energy);
+    read_energy_gpu(&total_gpu_power, &total_gpu_energy);
 
-        printf(" %.3f", total_power);
-        if (has_energy)
-            printf(" %.3f", total_energy);
+    printf(" %.3f", total_gpu_power);
+    if (has_energy)
+        printf(" %.3f", total_gpu_energy);
 
-        if (per_gpu_output) {
-            for (unsigned int i = 0; i < gpu_count; i++) {
-                printf(" %.3f", gpu_powers[i] / 1000.0);
-                if (has_energy)
-                    printf(" %.3f", gpu_energies[i]);
-            }
+    if (per_gpu_output) {
+        for (unsigned int i = 0; i < gpu_count; i++) {
+            printf(" %.3f", gpu_powers[i] / 1000.0);
+            if (has_energy)
+                printf(" %.3f", gpu_energies[i]);
         }
     }
 }
@@ -122,6 +123,7 @@ fini_nvml(void)
 
 void init_nvml(void) {}
 void fini_nvml(void) {}
+void monitor_gpu_energy(void) {}
 
 #endif
 
