@@ -37,14 +37,13 @@ usage(void)
         "  -I             Enable IPMI power measurement\n"
         "  -p <pid>       Monitor a specific process by PID\n"
         "  -f <field specs>\n"
-        "     t: HH:MM:ss\n"
-        "     d: MM-dd\n"
+        "     d: Prepend MM-dd to the timestamp\n"
         "     c: CPU power\n"
         "     E: Show energy field in outputs\n"
         "     H: Show field headers in outputs\n"
 #ifndef NO_NVML
-        "  -g             Enable GPU power measurement\n"
-        "  -G             Show all powers of GPU devices\n"
+        "     g: GPU total power\n"
+        "     G: Per-GPU power (implies g)\n"
 #endif
         );
 }
