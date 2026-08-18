@@ -107,7 +107,6 @@ parse_args(int argc, char *argv[])
             exit(0);
         case 'I':
             use_ipmi = 1;
-            init_ipmi();
             break;
         case 'p':
             add_proc_usage((pid_t)strtoul(optarg, NULL, 10));
