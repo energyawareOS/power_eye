@@ -21,7 +21,7 @@ static ipmi_context_t ipmi_ctx;
 
 int use_ipmi = 0;
 extern int has_energy;
-extern int interval;
+extern unsigned long interval;
 
 static int
 do_init_ipmi()
@@ -158,7 +158,7 @@ monitor_ipmi(void)
         if (power_ipmi >= 0) {
             printf(" %d", power_ipmi);
             if (has_energy) {
-                ipmi_energy += power_ipmi * (interval / 1000000.0);
+                ipmi_energy += power_ipmi * ((double)interval / 1000000.0);
                 printf(" %.3f", ipmi_energy);
             }
         }

@@ -30,7 +30,7 @@ usage(void)
     printf(
         "Usage: power_eye <options>\n"
         "Options:\n"
-        "  -i <interval>  Sampling interval in seconds (default: 1 second)\n"
+        "  -i <interval>  Sampling interval in seconds, fractions allowed (default: 1)\n"
         "  -t <timeout>   Total measurement duration in seconds (default: 120 seconds)\n"
         "  -d             Enable DRAM power measurement\n"
         "  -h             Show this help message and exit\n"
@@ -87,7 +87,15 @@ parse_args(int argc, char *argv[])
     while ((c = getopt(argc, argv, "i:t:f:dhIp:")) != -1) {
         switch (c) {
         case 'i':
-            interval = strtoul(optarg, NULL, 10) * 1000000;
+            {
+                char *end;
+                double sec = strtod(optarg, &end);
+                if (*end != '\0' || sec < 0.001) {
+                    fprintf(stderr, "Invalid interval value: %s\n", optarg);
+                    exit(EXIT_FAILURE);
+                }
+                interval = (unsigned long)(sec * 1000000.0 + 0.5);
+            }
             break;
         case 't':
             timeout = strtoul(optarg, NULL, 10);

@@ -6,8 +6,8 @@
 struct timespec ts_real, ts_start, ts_next;
 
 extern int has_mmdd;
-extern int interval;
-extern int timeout;
+extern unsigned long interval;
+extern unsigned int timeout;
 
 static inline void
 timespec_add_us(struct timespec *ts, const long usec)
@@ -43,10 +43,11 @@ wait_until_aligned_interval(void)
     struct timespec ts;
     clock_gettime(CLOCK_REALTIME, &ts);
 
-    unsigned intv = interval / 1000000; // Convert microseconds to seconds
+    // Whole-second intervals align to the minute; sub-second/fractional ones to the next second
+    unsigned intv = interval / 1000000;
     unsigned sec = ts.tv_sec % 60;
     unsigned nsec = ts.tv_nsec;
-    unsigned wait_sec = (sec % intv == 0) ? 0 : intv - (sec % intv);
+    unsigned wait_sec = (intv == 0 || sec % intv == 0) ? 0 : intv - (sec % intv);
     long wait_usec = (1000000000L - nsec) / 1000;
 
     // total wait time(microsecond)
@@ -81,7 +82,7 @@ timestamp_sleep(void)
 {
     uint64_t elapsed_from_start = get_usec_elapsed(&ts_start, &ts_next);
 
-    if (elapsed_from_start >= timeout * 1000000)
+    if (elapsed_from_start >= (uint64_t)timeout * 1000000)
         return 1;
 
     timespec_add_us(&ts_next, interval);
