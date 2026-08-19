@@ -148,19 +148,31 @@ get_ipmi_power_reading(void)
     return current_power;
 }
 
+static int ipmi_power = -1;
+static double ipmi_energy;
+
 void
 monitor_ipmi(void)
 {
-    double ipmi_energy = 0.0;
-    int power_ipmi = -1;
-    if (use_ipmi) {
-        power_ipmi = get_ipmi_power_reading();
-        if (power_ipmi >= 0) {
-            printf(" %d", power_ipmi);
-            if (has_energy) {
-                ipmi_energy += power_ipmi * ((double)interval / 1000000.0);
-                printf(" %.3f", ipmi_energy);
-            }
-        }
+    if (!use_ipmi)
+        return;
+    ipmi_power = get_ipmi_power_reading();
+    ipmi_energy = ipmi_power >= 0 ? ipmi_power * ((double)interval / 1000000.0)
+                                  : 0.0;
+}
+
+void
+report_ipmi(void)
+{
+    if (!use_ipmi)
+        return;
+    if (ipmi_power < 0) {
+        printf(" -");
+        if (has_energy)
+            printf(" -");
+        return;
     }
+    printf(" %d", ipmi_power);
+    if (has_energy)
+        printf(" %.3f", ipmi_energy);
 }

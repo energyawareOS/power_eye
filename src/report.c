@@ -11,6 +11,7 @@ extern void print_proc_headers(void);
 extern const char *get_current_time_str(void);
 extern void report_powercap_energy(void);
 extern void report_gpu_energy(void);
+extern void report_ipmi(void);
 extern void report_proc_usage(void);
 
 void
@@ -38,6 +39,7 @@ report_by_timestep(void)
 
     report_powercap_energy();
     report_gpu_energy();
+    report_ipmi();
     report_proc_usage();
 
     printf("\n");
