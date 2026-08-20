@@ -5,7 +5,7 @@ It is implemented in C and built with CMake.
 
 ## Features
 
-- CPU package power & energy via Intel RAPL
+- CPU package power & energy via Intel RAPL (all sockets are summed)
 - Optional DRAM domain power & energy (`-d`)
 - Optional system-wide power via IPMI (`-I`)
 - Optional GPU total and per-GPU power & energy via NVIDIA NVML (`-f g`, `-f G`)
@@ -16,7 +16,7 @@ It is implemented in C and built with CMake.
 - **OS:** Linux with `/sys/class/powercap` (RAPL) support. Reading `energy_uj` may require root or a udev rule.
 - **CPU:** Intel processor with RAPL package—and optionally DRAM—domains
 - **GPU (optional):** NVIDIA driver + NVML (`libnvidia-ml.so`) if using `-f g`/`-f G`
-- **IPMI (optional):** `ipmitool` accessible on PATH if using `-I`
+- **IPMI (optional):** a BMC exposed through the kernel IPMI driver (`/dev/ipmi0`, `/dev/ipmi/0` or `/dev/ipmidev/0`) if using `-I`; `ipmitool` is not required
 
 ## Build Instructions
 
@@ -56,9 +56,9 @@ cmake --build build
 ```
 
 Options:
-- `-i <interval>`: Sampling interval in seconds (default: 1)
+- `-i <interval>`: Sampling interval in seconds; fractional values such as `0.5` are accepted, invalid or sub-millisecond values are rejected (default: 1)
 - `-t <timeout>`: Total measurement duration in seconds (default: 120)
-- `-d`: Enable DRAM power/energy (if the DRAM RAPL domain exists)
+- `-d`: Enable DRAM power/energy, summed over all sockets (if no DRAM RAPL domain exists, a warning is printed and DRAM is disabled)
 - `-I`: Enable IPMI power measurement
 - `-p <pid>`: Monitor a specific process by PID. May be given multiple times.
 - `-f <specs>`: Field/output specs. `<specs>` is a string of letters (e.g. `-f cEH`):
@@ -108,6 +108,13 @@ Options:
     [time] CPU(W) GPU(W) [GPU(J)] GPU00(W) [GPU00(J)] GPU01(W) [GPU01(J)] ...
     ```
 
+- **IPMI (`-I`):**
+  The IPMI columns come after the GPU columns and before the per-process columns, matching the header order:
+    ```text
+    ... IPMI(W) [IPMI(J)] ...
+    ```
+  If a reading fails, `-` is printed in place of each value so the column count stays constant.
+
 - **Per-process attribution (`-p <pid>`):**
   Per-pid columns are appended at the end. Without GPU, each pid contributes one (or two with `E`) columns:
     ```text
@@ -145,14 +152,15 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 - **Platform support**
   - Requires Linux with RAPL exposed under `/sys/class/powercap`.
   - Works on **Intel** CPUs that support RAPL. AMD/others are not supported.
-  - Only **package 0** (`intel-rapl:0`) is read; multi-socket systems beyond pkg0 are not measured.
+  - All CPU packages (`intel-rapl:N`) are read and summed; DRAM subdomains are summed the same way. Per-socket breakdown is not available.
+  - RAPL counter wraparound is handled using `max_energy_range_uj`.
   - The DRAM RAPL domain may not be present on all platforms.
 
 - **Permissions**
   - Reading `energy_uj` may require elevated privileges. Use `sudo` or adjust permissions via a udev rule (distro-specific).
 
 - **DRAM flag (`-d`)**
-  - If your system lacks a DRAM RAPL domain, using `-d` will fail. Omit `-d` in that case.
+  - If your system lacks a DRAM RAPL domain, a warning is printed and DRAM output is disabled; the run continues with CPU only.
 
 - **GPU measurement (`-f g`, `-f G`)**
   - Requires NVIDIA driver + NVML (`libnvidia-ml.so`) and a build with `-DUSE_NVML=ON`.
