@@ -6,6 +6,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 
 include_directories(include)
 
-add_subdirectory(src)
+# Must be declared before add_subdirectory() so src/ sees it.
+option(USE_NVML "Build with NVIDIA NVML support" OFF)
 
-option(USE_NVML "Build with NVIDIA NVML support" ON)
+add_subdirectory(src)
