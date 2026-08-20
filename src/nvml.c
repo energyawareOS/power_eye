@@ -13,7 +13,7 @@ double total_gpu_power, total_gpu_energy;
 extern unsigned long interval;
 extern int has_energy;
 
-static int no_nvml;
+static int no_nvml, nvml_inited;
 
 nvmlDevice_t *gpu_handles;
 unsigned int *gpu_powers;
@@ -83,15 +83,21 @@ report_gpu_energy(void)
 void
 init_nvml(void)
 {
+    /* Only touch NVML when GPU output was requested (-f g / -f G). */
+    if (!use_gpu)
+        return;
+
     const int err = nvmlInit_v2();
     if (err != NVML_SUCCESS) {
         if (err == NVML_ERROR_NOT_SUPPORTED) {
             no_nvml = 1;
             return;
         }
-        fprintf(stderr, "NVML init failed: %d\n", err);
+        fprintf(stderr, "NVML init failed: %s (%d)\n", nvmlErrorString(err),
+                err);
         exit(EXIT_FAILURE);
     }
+    nvml_inited = 1;
     if (nvmlDeviceGetCount_v2(&gpu_count) != NVML_SUCCESS || gpu_count == 0) {
         fprintf(stderr, "No NVIDIA GPUs found\n");
         exit(EXIT_FAILURE);
@@ -120,7 +126,10 @@ fini_nvml(void)
         free(gpu_handles);
         gpu_handles = NULL;
     }
-    nvmlShutdown();
+    if (nvml_inited) {
+        nvmlShutdown();
+        nvml_inited = 0;
+    }
 }
 
 #else
