@@ -42,8 +42,12 @@ list of cpuidle states in `env.txt` shows their effect).
 
 - Observer commands are `exec`'d in their own session and must not need `sudo`
   (the harness already runs as root). Paths must not contain spaces.
-- Only the observer's main process is tracked (not its children); the trace
-  pass matches on `comm`, which Go/multi-threaded programs share across threads.
+- The observer and all its descendants are tracked (wrappers such as `sudo` or
+  shell scripts are fine); only processes alive at both ends of the window are
+  counted. The trace pass matches on the descendants' `comm` names, which
+  Go/multi-threaded programs share across threads.
+- `summary.md` starts with a `Warnings` section (missing RAPL/turbostat data,
+  observer not running, no deep C-state residency) -- read it before the tables.
 - A desktop with background activity has thousands of idle entries/s; effects
   smaller than that noise need long windows and many trials. Close other
   applications and fix the CPU governor/turbo setting before measuring.
