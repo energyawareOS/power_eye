@@ -32,8 +32,9 @@ def make_run(out, trial, scen, pkg_j, c6_us, entries, vol0, vol1, trace=None):
     write(os.path.join(d, "post.idle"), post)
     write(os.path.join(d, "pre.stat"), "intr 1000\nctxt 5000\n")
     write(os.path.join(d, "post.stat"), "intr 3000\nctxt 15000\n")
-    write(os.path.join(d, "pre.obs"), "vol %d\nnonvol 0\nutime 0\nstime 0\n" % vol0)
-    write(os.path.join(d, "post.obs"), "vol %d\nnonvol 0\nutime 50\nstime 50\n" % vol1)
+    # one wrapper (idle) + one worker; a third process exists only at the end and must be ignored
+    write(os.path.join(d, "pre.obs"), "10 5 0 0 0\n11 %d 0 0 0\n" % vol0)
+    write(os.path.join(d, "post.obs"), "10 5 0 0 0\n11 %d 0 50 50\n12 999 0 999 999\n" % vol1)
     write(os.path.join(d, "perf.csv"),
           "# started on ...\n\n%.2f,Joules,power/energy-pkg/,100000000000,100.00,,\n"
           "<not supported>,,power/energy-gpu/,0,100.00,,\n" % pkg_j)
