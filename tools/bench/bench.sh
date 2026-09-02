@@ -153,14 +153,33 @@ snap_idle() { # cpu state name usage time_us latency_us (tab separated)
 
 snap_stat() { awk '$1=="intr"||$1=="ctxt"{print $1, $2}' /proc/stat > "$1"; }
 
-snap_obs() { # $1 pid, $2 outfile: voluntary/involuntary switches (all threads), cpu ticks
-    local pid=$1 out=$2 s f
-    if [ -z "$pid" ] || [ ! -r "/proc/$pid/stat" ]; then echo "dead 1" > "$out"; return; fi
-    awk '/^voluntary_ctxt_switches/{v+=$2} /^nonvoluntary_ctxt_switches/{n+=$2}
-         END{print "vol", v+0; print "nonvol", n+0}' /proc/$pid/task/*/status > "$out" 2>/dev/null
-    s=$(<"/proc/$pid/stat"); s=${s##*) }
-    read -ra f <<< "$s"   # f[0]=state (field 3) -> utime/stime (fields 14/15) = f[11]/f[12]
-    echo "utime ${f[11]:-0}" >> "$out"; echo "stime ${f[12]:-0}" >> "$out"
+descendants() { # $1 root pid -> root and all descendants (sudo/wrapper scripts safe)
+    ps -e -o pid= -o ppid= | awk -v r="$1" '{p[$1]=$2}
+        END{for(i in p){x=i; while((x in p) && x!=r && x>1) x=p[x]; if(x==r) print i}}'
+}
+
+snap_obs() { # $1 root pid, $2 outfile: one line per process: pid vol nonvol utime stime
+    local pid=$1 out=$2 p s f v
+    : > "$out"
+    [ -n "$pid" ] || return 0
+    for p in $(descendants "$pid"); do
+        [ -r "/proc/$p/stat" ] || continue
+        v=$(awk '/^voluntary_ctxt_switches/{a+=$2} /^nonvoluntary_ctxt_switches/{b+=$2}
+                 END{print a+0, b+0}' /proc/$p/task/*/status 2>/dev/null) || continue
+        s=$(<"/proc/$p/stat") || continue
+        s=${s##*) }
+        read -ra f <<< "$s"   # f[0]=state (field 3) -> utime/stime (fields 14/15) = f[11]/f[12]
+        echo "$p $v ${f[11]:-0} ${f[12]:-0}" >> "$out"
+    done
+}
+
+# Names of the processes under the observer, minus generic wrappers (for the trace pass).
+obs_comms() {
+    local p c
+    for p in $(descendants "$1"); do
+        c=$(<"/proc/$p/comm") 2>/dev/null || continue
+        case $c in bash|sh|sudo|setsid|env|timeout|nohup|sleep|ps|awk) ;; *) echo "$c" ;; esac
+    done | sort -u | paste -sd,
 }
 
 snap_ipmi() { [ "$IPMI" = 1 ] && command -v ipmitool >/dev/null && ipmitool dcmi power reading > "$1" 2>&1; }
@@ -173,7 +192,8 @@ start_observer() { # name cmd dir
     OBS_PID=$!
     sleep 1
     kill -0 "$OBS_PID" 2>/dev/null || { echo "observer '$1' died; see $3/obs.log" >&2; OBS_PID=""; return 1; }
-    OBS_COMM=$(<"/proc/$OBS_PID/comm")
+    OBS_COMM=$(obs_comms "$OBS_PID")
+    [ -n "$OBS_COMM" ] || OBS_COMM=$(<"/proc/$OBS_PID/comm")
 }
 stop_observer() {
     [ -n "$OBS_PID" ] || return 0
@@ -197,8 +217,12 @@ window_cmd() { # $1 dir
 trace_pass() { # $1 dir
     local prog='tracepoint:sched:sched_switch /args->prev_pid == 0/ { @idle_exit_total = count();'
     if [ -n "$OBS_COMM" ]; then
-        local c=${OBS_COMM//[^A-Za-z0-9_.-]/}
-        prog+=" if (args->next_comm == \"$c\") { @idle_exit_obs = count(); }"
+        local c cond=""
+        for c in ${OBS_COMM//,/ }; do
+            c=${c//[^A-Za-z0-9_.-]/}
+            cond+="${cond:+ || }args->next_comm == \"$c\""
+        done
+        prog+=" if ($cond) { @idle_exit_obs = count(); }"
     fi
     prog+=' }'
     timeout -s INT "$TRACE_DUR" bpftrace -e "$prog" > "$1/trace.txt" 2>&1
@@ -219,13 +243,21 @@ run_one() { # trial pos name cmd
     snap_idle "$dir/post.idle"; snap_stat "$dir/post.stat"
     snap_obs "$OBS_PID" "$dir/post.obs"; snap_ipmi "$dir/post.ipmi"
 
+    if [ -z "${BENCH_WINDOW_CMD:-}" ]; then
+        [ -s "$dir/perf.csv" ] || { echo "WARNING: no perf.csv (RAPL energy lost) in $dir; window.log:" >&2; tail -n 5 "$dir/window.log" >&2; }
+        [ "$TURBOSTAT" = 1 ] && { [ -s "$dir/turbostat.txt" ] || { echo "WARNING: no turbostat.txt in $dir; window.log:" >&2; tail -n 5 "$dir/window.log" >&2; }; }
+    fi
+    if [ -n "$cmd" ] && [ ! -s "$dir/post.obs" ]; then
+        echo "WARNING: observer '$name' was not running at the end of the window; see $dir/obs.log" >&2
+    fi
+
     local tdur=0
     if [ "$TRACE" = 1 ] && [ -z "${BENCH_WINDOW_CMD:-}" ]; then trace_pass "$dir"; tdur=$TRACE_DUR; fi
 
     {
         echo "scenario=$name"; echo "trial=$trial"; echo "pos=$pos"
         echo "dur=$DUR"; echo "t0=$t0"; echo "t1=$t1"; echo "trace_dur=$tdur"
-        echo "obs_pid=$OBS_PID"; echo "obs_comm=$OBS_COMM"; echo "cmd=$cmd"
+        echo "obs_pid=$OBS_PID"; echo "obs_comm=$OBS_COMM"; echo "obs_nproc=$(wc -l < "$dir/pre.obs")"; echo "cmd=$cmd"
     } > "$dir/meta"
     stop_observer
     sleep "$COOLDOWN"
