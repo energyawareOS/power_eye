@@ -208,7 +208,7 @@ window_cmd() { # $1 dir
     if [ -n "${BENCH_WINDOW_CMD:-}" ]; then echo "$BENCH_WINDOW_CMD"; return; fi
     local perf="perf stat -a -x, -e $EV -o $1/perf.csv -- sleep $DUR"
     if [ "$TURBOSTAT" = 1 ]; then
-        echo "turbostat --quiet --summary --out $1/turbostat.txt $perf"
+        echo "turbostat -q -S -o $1/turbostat.txt $perf"
     else
         echo "$perf"
     fi
@@ -267,6 +267,22 @@ shuffle() { if [ -n "$SEED" ]; then shuf --random-source=<(yes "$SEED-$1"); else
 
 mkdir -p "$OUT/raw"
 capture_env
+
+# Pre-flight: run the real window command once, briefly, so option/permission
+# problems (e.g. turbostat option names differ between versions) abort here
+# instead of silently producing runs without data.
+if [ "$DRY" = 0 ] && [ -z "${BENCH_WINDOW_CMD:-}" ]; then
+    pf="$OUT/preflight"; mkdir -p "$pf"
+    DUR_SAVE=$DUR; DUR=1
+    if ! $(window_cmd "$pf") > "$pf/window.log" 2>&1 || [ ! -s "$pf/perf.csv" ] ||
+       { [ "$TURBOSTAT" = 1 ] && [ ! -s "$pf/turbostat.txt" ]; }; then
+        echo "pre-flight failed; command was: $(window_cmd "$pf")" >&2
+        tail -n 8 "$pf/window.log" >&2
+        die "fix the above, or try --no-turbostat"
+    fi
+    DUR=$DUR_SAVE
+    rm -rf "$pf"
+fi
 
 if [ "$DRY" = 1 ]; then
     echo "DRY RUN. Environment written to $OUT/env.txt"
