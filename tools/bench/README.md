@@ -9,7 +9,7 @@ it observes, without the measurement itself disturbing it.
 |---|---|---|
 | RAPL energy (`pkg`, `cores`, `ram`) | `perf stat -a -x,` **without** `-I` | counting mode, read once at exit |
 | C-state residency, idle entries | `/sys/devices/system/cpu/cpu*/cpuidle/state*/{usage,time}` diff | two reads: start and end |
-| Pkg C-states, IRQ, watts | `turbostat --summary <cmd>` (command-wrapping mode) | snapshots at start/end only |
+| Pkg C-states, IRQ, watts | `turbostat -q -S <cmd>` (command-wrapping mode) | snapshots at start/end only |
 | Interrupts, context switches | `/proc/stat` diff | two reads |
 | Observer's own wakeups/CPU | `/proc/<pid>/task/*/status` + `stat` diff | two reads |
 
