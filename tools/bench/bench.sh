@@ -158,8 +158,8 @@ descendants() { # $1 root pid -> root and all descendants (sudo/wrapper scripts 
         END{for(i in p){x=i; while((x in p) && x!=r && x>1) x=p[x]; if(x==r) print i}}'
 }
 
-snap_obs() { # $1 root pid, $2 outfile: one line per process: pid vol nonvol utime stime
-    local pid=$1 out=$2 p s f v
+snap_obs() { # $1 root pid, $2 outfile: one line per process: pid vol nonvol utime stime runtime_ns
+    local pid=$1 out=$2 p s f v rt
     : > "$out"
     [ -n "$pid" ] || return 0
     for p in $(descendants "$pid"); do
@@ -169,7 +169,8 @@ snap_obs() { # $1 root pid, $2 outfile: one line per process: pid vol nonvol uti
         s=$(<"/proc/$p/stat") || continue
         s=${s##*) }
         read -ra f <<< "$s"   # f[0]=state (field 3) -> utime/stime (fields 14/15) = f[11]/f[12]
-        echo "$p $v ${f[11]:-0} ${f[12]:-0}" >> "$out"
+        rt=$(awk '{a+=$1} END{print a+0}' /proc/$p/task/*/schedstat 2>/dev/null)
+        echo "$p $v ${f[11]:-0} ${f[12]:-0} ${rt:-0}" >> "$out"
     done
 }
 

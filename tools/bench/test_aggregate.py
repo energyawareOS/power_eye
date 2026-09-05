@@ -33,8 +33,9 @@ def make_run(out, trial, scen, pkg_j, c6_us, entries, vol0, vol1, trace=None):
     write(os.path.join(d, "pre.stat"), "intr 1000\nctxt 5000\n")
     write(os.path.join(d, "post.stat"), "intr 3000\nctxt 15000\n")
     # one wrapper (idle) + one worker; a third process exists only at the end and must be ignored
-    write(os.path.join(d, "pre.obs"), "10 5 0 0 0\n11 %d 0 0 0\n" % vol0)
-    write(os.path.join(d, "post.obs"), "10 5 0 0 0\n11 %d 0 50 50\n12 999 0 999 999\n" % vol1)
+    write(os.path.join(d, "pre.obs"), "10 5 0 0 0 0\n11 %d 0 0 0 0\n" % vol0)
+    write(os.path.join(d, "post.obs"),
+          "10 5 0 0 0 0\n11 %d 0 1 1 10000000\n12 999 0 999 999 999\n" % vol1)
     write(os.path.join(d, "perf.csv"),
           "# started on ...\n\n%.2f,Joules,power/energy-pkg/,100000000000,100.00,,\n"
           "<not supported>,,power/energy-gpu/,0,100.00,,\n" % pkg_j)
@@ -64,7 +65,8 @@ class AggregateTest(unittest.TestCase):
             self.assertAlmostEqual(float(r["ts_Pkg%pc6"]), 42.5)
             o = rows[("obs", "2")]
             self.assertAlmostEqual(float(o["obs_vol_ctxt_per_s"]), 2.0)
-            self.assertAlmostEqual(float(o["obs_cpu_ms_per_s"]), 10000 / 100 / 100 * 10, places=3)
+            # 10 ms of schedstat runtime over 100 s -> 0.1 ms/s (clock ticks would say 20)
+            self.assertAlmostEqual(float(o["obs_cpu_ms_per_s"]), 0.1, places=4)
             self.assertAlmostEqual(float(o["idle_exit_obs_per_s"]), 3.0)
             with open(os.path.join(out, "summary.md")) as f:
                 summary = f.read()

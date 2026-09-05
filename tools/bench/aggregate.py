@@ -87,15 +87,15 @@ def read_pairs(path):
 
 
 def read_obs(path):
-    """pre/post.obs: 'pid vol nonvol utime stime' per process."""
+    """pre/post.obs: 'pid vol nonvol utime stime [runtime_ns]' per process."""
     d = {}
     if os.path.exists(path):
         with open(path) as f:
             for line in f:
                 p = line.split()
-                if len(p) == 5:
+                if len(p) in (5, 6):
                     try:
-                        d[int(p[0])] = tuple(int(x) for x in p[1:])
+                        d[int(p[0])] = tuple(int(x) for x in p[1:]) + (0,) * (6 - len(p))
                     except ValueError:
                         pass
     return d
@@ -191,11 +191,14 @@ def run_metrics(d, deep_lat_us):
     common = set(o0) & set(o1)  # processes alive at both ends
     if common:
         hz = os.sysconf("SC_CLK_TCK")
-        dv = [sum(o1[p][i] - o0[p][i] for p in common) for i in range(4)]
+        dv = [sum(o1[p][i] - o0[p][i] for p in common) for i in range(5)]
         row["obs_nproc"] = len(common)
         row["obs_vol_ctxt_per_s"] = dv[0] / window
         row["obs_nonvol_ctxt_per_s"] = dv[1] / window
-        row["obs_cpu_ms_per_s"] = (dv[2] + dv[3]) / hz * 1000.0 / window
+        if any(o1[p][4] for p in common):  # schedstat run time, ns resolution
+            row["obs_cpu_ms_per_s"] = dv[4] / 1e6 / window
+        else:                              # fallback: clock ticks (10 ms resolution)
+            row["obs_cpu_ms_per_s"] = (dv[2] + dv[3]) / hz * 1000.0 / window
     elif meta.get("obs_pid"):
         row["obs_lost"] = 1  # observer configured but not alive at both ends
     for k, v in parse_perf(os.path.join(d, "perf.csv")).items():
