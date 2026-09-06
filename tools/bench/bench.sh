@@ -282,6 +282,15 @@ shuffle() { if [ -n "$SEED" ]; then shuf --random-source=<(yes "$SEED-$1"); else
 mkdir -p "$OUT/raw"
 capture_env
 
+# Software-disabled cpuidle states make the experiment blind to deep C-states.
+disabled=$(for d in $SYS/cpu[0-9]*/cpuidle/state[0-9]*; do
+               [ "$(<"$d/disable")" = 1 ] && echo "$(<"$d/name")"
+           done | sort -u | paste -sd,)
+if [ -n "$disabled" ]; then
+    echo "WARNING: cpuidle states disabled by software (not BIOS): $disabled" >&2
+    echo "         deep C-state residency will be 0; check tuned/cpupower/boot scripts (see README)" >&2
+fi
+
 # Pre-flight: run the real window command once, briefly, so option/permission
 # problems (e.g. turbostat option names differ between versions) abort here
 # instead of silently producing runs without data.

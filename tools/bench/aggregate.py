@@ -262,8 +262,9 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("outdir")
     ap.add_argument("--baseline", default="none")
-    ap.add_argument("--deep-latency-us", type=float, default=100.0,
-                    help="cpuidle states with exit latency >= this count as deep (default 100)")
+    ap.add_argument("--deep-latency-us", type=float, default=30.0,
+                    help="cpuidle states with exit latency >= this count as deep (default 30: "
+                         "C3 40us / C6 133us on Xeon E5 v4, C2 120us on ACPI idle; C1E 10us is shallow)")
     args = ap.parse_args()
 
     dirs = sorted(glob.glob(os.path.join(args.outdir, "raw", "*", "meta")))
@@ -279,6 +280,13 @@ def main():
         w.writerows(rows)
 
     warnings = []
+    envp = os.path.join(args.outdir, "env.txt")
+    if os.path.exists(envp):
+        with open(envp) as f:
+            off = [l.split()[1][5:] for l in f if l.startswith("state") and " disable=1" in l]
+        if off:
+            warnings.append("cpuidle states disabled by software on cpu0 (see env.txt): %s -- "
+                            "deep residency cannot be observed in this configuration" % ", ".join(off))
     n = len(rows)
     for key, what in (("pkg_J", "RAPL energy (perf.csv missing or unparsable; see raw/*/window.log)"),
                       ("ts_Busy%", "turbostat summary (turbostat.txt missing or unparsable)")):
