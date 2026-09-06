@@ -86,6 +86,18 @@ def read_pairs(path):
     return d
 
 
+def read_times(path):
+    """times: 'name start end' per snapshot -> {name: midpoint}."""
+    d = {}
+    if os.path.exists(path):
+        with open(path) as f:
+            for line in f:
+                p = line.split()
+                if len(p) == 3:
+                    d[p[0]] = (float(p[1]) + float(p[2])) / 2.0
+    return d
+
+
 def read_obs(path):
     """pre/post.obs: 'pid vol nonvol utime stime [runtime_ns]' per process."""
     d = {}
@@ -176,7 +188,16 @@ def parse_ipmi(path):
 
 def run_metrics(d, deep_lat_us):
     meta = read_kv(os.path.join(d, "meta"))
-    window = float(meta["t1"]) - float(meta["t0"])
+    outer = float(meta["t1"]) - float(meta["t0"])
+    dur = float(meta.get("dur", outer))
+    tm = read_times(os.path.join(d, "times"))
+
+    def span(kind):  # interval between this kind's own pre/post snapshots
+        if "pre." + kind in tm and "post." + kind in tm:
+            return tm["post." + kind] - tm["pre." + kind]
+        return outer
+
+    window = span("idle")
     row = {"scenario": meta["scenario"], "trial": int(meta["trial"]),
            "pos": int(meta.get("pos", 0)), "window_s": window,
            "obs_comm": meta.get("obs_comm", "")}
@@ -185,25 +206,27 @@ def run_metrics(d, deep_lat_us):
                             window, deep_lat_us))
     s0, s1 = read_pairs(os.path.join(d, "pre.stat")), read_pairs(os.path.join(d, "post.stat"))
     if "intr" in s0 and "intr" in s1:
-        row["intr_per_s"] = (s1["intr"] - s0["intr"]) / window
-        row["ctxt_per_s"] = (s1["ctxt"] - s0["ctxt"]) / window
+        ws = span("stat")
+        row["intr_per_s"] = (s1["intr"] - s0["intr"]) / ws
+        row["ctxt_per_s"] = (s1["ctxt"] - s0["ctxt"]) / ws
     o0, o1 = read_obs(os.path.join(d, "pre.obs")), read_obs(os.path.join(d, "post.obs"))
     common = set(o0) & set(o1)  # processes alive at both ends
     if common:
         hz = os.sysconf("SC_CLK_TCK")
+        wo = span("obs")
         dv = [sum(o1[p][i] - o0[p][i] for p in common) for i in range(5)]
         row["obs_nproc"] = len(common)
-        row["obs_vol_ctxt_per_s"] = dv[0] / window
-        row["obs_nonvol_ctxt_per_s"] = dv[1] / window
+        row["obs_vol_ctxt_per_s"] = dv[0] / wo
+        row["obs_nonvol_ctxt_per_s"] = dv[1] / wo
         if any(o1[p][4] for p in common):  # schedstat run time, ns resolution
-            row["obs_cpu_ms_per_s"] = dv[4] / 1e6 / window
+            row["obs_cpu_ms_per_s"] = dv[4] / 1e6 / wo
         else:                              # fallback: clock ticks (10 ms resolution)
-            row["obs_cpu_ms_per_s"] = (dv[2] + dv[3]) / hz * 1000.0 / window
+            row["obs_cpu_ms_per_s"] = (dv[2] + dv[3]) / hz * 1000.0 / wo
     elif meta.get("obs_pid"):
         row["obs_lost"] = 1  # observer configured but not alive at both ends
     for k, v in parse_perf(os.path.join(d, "perf.csv")).items():
         row[k] = v
-        row[k[:-2] + "_W"] = v / window
+        row[k[:-2] + "_W"] = v / dur  # perf counted exactly while 'sleep dur' ran
     row.update(parse_turbostat(os.path.join(d, "turbostat.txt")))
     tr, tdur = parse_trace(os.path.join(d, "trace.txt")), float(meta.get("trace_dur", 0))
     if tdur > 0 and tr:

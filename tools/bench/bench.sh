@@ -229,20 +229,33 @@ trace_pass() { # $1 dir
     timeout -s INT "$TRACE_DUR" bpftrace -e "$prog" > "$1/trace.txt" 2>&1
 }
 
+# Run a snapshot and record its start/end time; the aggregator uses the midpoint
+# so every metric is divided by the interval its own snapshots actually span.
+timed() { # name cmd...
+    local name=$1 a b; shift
+    a=$(now); "$@"; b=$(now)
+    echo "$name $a $b" >> "$DIR/times"
+}
+
 run_one() { # trial pos name cmd
     local trial=$1 pos=$2 name=$3 cmd=$4
     local dir="$OUT/raw/$(printf '%03d' "$trial")_$name"
-    mkdir -p "$dir"
+    mkdir -p "$dir"; DIR=$dir
     start_observer "$name" "$cmd" "$dir" || { stop_observer; return 1; }
     sleep "$SETTLE"
 
-    snap_idle "$dir/pre.idle"; snap_stat "$dir/pre.stat"
-    snap_obs "$OBS_PID" "$dir/pre.obs"; snap_ipmi "$dir/pre.ipmi"
+    # Slow snapshots first, cpuidle last so it hugs the measured window.
+    timed pre.obs snap_obs "$OBS_PID" "$dir/pre.obs"
+    timed pre.stat snap_stat "$dir/pre.stat"
+    snap_ipmi "$dir/pre.ipmi"
+    timed pre.idle snap_idle "$dir/pre.idle"
     local t0 t1; t0=$(now)
     $(window_cmd "$dir") > "$dir/window.log" 2>&1
     t1=$(now)
-    snap_idle "$dir/post.idle"; snap_stat "$dir/post.stat"
-    snap_obs "$OBS_PID" "$dir/post.obs"; snap_ipmi "$dir/post.ipmi"
+    timed post.idle snap_idle "$dir/post.idle"
+    timed post.stat snap_stat "$dir/post.stat"
+    timed post.obs snap_obs "$OBS_PID" "$dir/post.obs"
+    snap_ipmi "$dir/post.ipmi"
 
     if [ -z "${BENCH_WINDOW_CMD:-}" ]; then
         [ -s "$dir/perf.csv" ] || { echo "WARNING: no perf.csv (RAPL energy lost) in $dir; window.log:" >&2; tail -n 5 "$dir/window.log" >&2; }

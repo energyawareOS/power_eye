@@ -22,7 +22,12 @@ def make_run(out, trial, scen, pkg_j, c6_us, entries, vol0, vol1, trace=None):
     write(os.path.join(d, "meta"),
           "scenario=%s\ntrial=%d\npos=1\ndur=100\nt0=1000.0\nt1=%.1f\n"
           "trace_dur=%d\nobs_pid=1\nobs_comm=x\ncmd=\n" %
-          (scen, trial, 1000.0 + WINDOW, 10 if trace else 0))
+          (scen, trial, 1000.0 + WINDOW + 3.0, 10 if trace else 0))  # outer window is 3 s longer
+    # snapshots span exactly WINDOW even though the outer window is longer
+    write(os.path.join(d, "times"),
+          "pre.obs 999.0 1001.0\npost.obs 1099.0 1101.0\n"
+          "pre.stat 999.9 1000.1\npost.stat 1099.9 1100.1\n"
+          "pre.idle 1000.0 1000.0\npost.idle 1100.0 1100.0\n")
     pre = post = ""
     for cpu in range(NCPU):
         pre += "%d\t0\tPOLL\t0\t0\t0\n%d\t1\tC1\t0\t0\t1\n%d\t2\tC6\t0\t0\t133\n" % (cpu, cpu, cpu)
