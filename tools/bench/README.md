@@ -11,7 +11,7 @@ it observes, without the measurement itself disturbing it.
 | C-state residency, idle entries | `/sys/devices/system/cpu/cpu*/cpuidle/state*/{usage,time}` diff | two reads: start and end |
 | Pkg C-states, IRQ, watts | `turbostat -q -S <cmd>` (command-wrapping mode) | snapshots at start/end only |
 | Interrupts, context switches | `/proc/stat` diff | two reads |
-| Observer's own wakeups/CPU | `/proc/<pid>/task/*/status` + `stat` diff | two reads |
+| Observer's own wakeups/CPU | `/proc/<pid>/task/*/status` + `schedstat` (ns) diff | two reads |
 
 Optional `--trace`: a **separate** `bpftrace` window counts idle exits
 (`sched_switch` with `prev_pid == 0`) in total and for the observer's `comm`.
@@ -26,7 +26,7 @@ on real hardware).
 sudo tools/bench/bench.sh -o results/desktop -d 600 -n 10 -s 60 \
      --note "BIOS C-states: C6 on, C1E on, package C-state limit auto" \
      -S pe1s='build/src/power_eye -i 1 -t 100000000' \
-     -S node_exporter='node_exporter --collector.disable-defaults --collector.rapl'
+     -S node_exporter='sh -c "node_exporter --collector.disable-defaults --collector.rapl & sleep 2; while sleep 15; do curl -s localhost:9100/metrics >/dev/null; done"'
 tools/bench/aggregate.py results/desktop      # -> runs.csv, summary.md
 tools/bench/test_aggregate.py                 # unit test, no root needed
 ```
@@ -39,6 +39,13 @@ options are not readable from the OS: always pass them with `--note`** (the
 list of cpuidle states in `env.txt` shows their effect).
 
 ## Caveats
+
+- **A passive exporter costs nothing until it is scraped.** Run node_exporter
+  together with a scraper (see the example above, 15 s like a typical Prometheus
+  config), otherwise its wakeups and CPU are legitimately 0.
+- Each metric is divided by the interval spanned by its own start/end snapshots
+  (recorded in `raw/*/times`), not by the outer window; RAPL watts use the
+  `sleep` duration `-d`.
 
 - Observer commands are `exec`'d in their own session and must not need `sudo`
   (the harness already runs as root). Paths must not contain spaces.
