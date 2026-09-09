@@ -8,6 +8,7 @@ it observes, without the measurement itself disturbing it.
 | Source | How | Why it is quiet |
 |---|---|---|
 | RAPL energy (`pkg`, `cores`, `ram`) | `perf stat -a -x,` **without** `-I` | counting mode, read once at exit |
+| HW C-state residency (`cstate_pkg`, `cstate_core`) | same `perf stat -a`, TSC ticks / (TSC MHz x window x instances) | counting mode, read once at exit |
 | C-state residency, idle entries | `/sys/devices/system/cpu/cpu*/cpuidle/state*/{usage,time}` diff | two reads: start and end |
 | Pkg C-states, IRQ, watts | `turbostat -q -S <cmd>` (command-wrapping mode) | snapshots at start/end only |
 | Interrupts, context switches | `/proc/stat` diff | two reads |
