@@ -21,7 +21,7 @@ def make_run(out, trial, scen, pkg_j, c6_us, entries, vol0, vol1, trace=None):
     os.makedirs(d)
     write(os.path.join(d, "meta"),
           "scenario=%s\ntrial=%d\npos=1\ndur=100\nt0=1000.0\nt1=%.1f\n"
-          "trace_dur=%d\nobs_pid=1\nobs_comm=x\ncmd=\n" %
+          "trace_dur=%d\nobs_pid=1\nobs_comm=x\ncmd=\nn_pkg=2\nn_core=24\n" %
           (scen, trial, 1000.0 + WINDOW + 3.0, 10 if trace else 0))  # outer window is 3 s longer
     # snapshots span exactly WINDOW even though the outer window is longer
     write(os.path.join(d, "times"),
@@ -43,9 +43,12 @@ def make_run(out, trial, scen, pkg_j, c6_us, entries, vol0, vol1, trace=None):
           "10 5 0 0 0 0\n11 %d 0 1 1 10000000\n12 999 0 999 999 999\n" % vol1)
     write(os.path.join(d, "perf.csv"),
           "# started on ...\n\n%.2f,Joules,power/energy-pkg/,100000000000,100.00,,\n"
-          "<not supported>,,power/energy-gpu/,0,100.00,,\n" % pkg_j)
+          "<not supported>,,power/energy-gpu/,0,100.00,,\n"
+          # 2 packages * 2200 MHz * 100 s * 80% = 352e9 ticks; 24 cores * 90% = 4752e9
+          "352000000000,,cstate_pkg/c6-residency/,100000000000,100.00,,\n"
+          "4752000000000,,cstate_core/c6-residency/,100000000000,100.00,,\n" % pkg_j)
     write(os.path.join(d, "turbostat.txt"),
-          "Core\tCPU\tAvg_MHz\tBusy%\tPkg%pc6\tPkgWatt\n-\t-\t800\t1.50\t42.5\t7.25\n")
+          "Core\tCPU\tAvg_MHz\tBusy%\tTSC_MHz\tPkg%pc6\tPkgWatt\n-\t-\t800\t1.50\t2200\t42.5\t7.25\n")
     if trace:
         write(os.path.join(d, "trace.txt"),
               "Attaching 1 probe...\n\n@idle_exit_obs: %d\n@idle_exit_total: %d\n" % trace)
@@ -68,6 +71,8 @@ class AggregateTest(unittest.TestCase):
             self.assertAlmostEqual(float(r["idle_entries_per_s"]), 8.0)  # 4 cpus * 200 / 100
             self.assertAlmostEqual(float(r["intr_per_s"]), 20.0)
             self.assertAlmostEqual(float(r["ts_Pkg%pc6"]), 42.5)
+            self.assertAlmostEqual(float(r["pkg_c6_pct"]), 80.0)
+            self.assertAlmostEqual(float(r["core_c6_pct"]), 90.0)
             o = rows[("obs", "2")]
             self.assertAlmostEqual(float(o["obs_vol_ctxt_per_s"]), 2.0)
             # 10 ms of schedstat runtime over 100 s -> 0.1 ms/s (clock ticks would say 20)

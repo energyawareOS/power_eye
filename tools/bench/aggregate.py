@@ -20,11 +20,14 @@ T95 = [12.706, 4.303, 3.182, 2.776, 2.571, 2.447, 2.365, 2.306, 2.262, 2.228,
        2.080, 2.074, 2.069, 2.064, 2.060, 2.056, 2.052, 2.048, 2.045, 2.042]
 
 KEY_METRICS = [
-    "pkg_W", "ram_W", "deep_resid_pct", "idle_entries_per_s", "intr_per_s",
+    "pkg_W", "ram_W", "deep_resid_pct", "core_c6_pct", "pkg_c2_pct", "pkg_c6_pct", "idle_entries_per_s", "intr_per_s",
     "ctxt_per_s", "obs_vol_ctxt_per_s", "obs_cpu_ms_per_s",
     "idle_exit_total_per_s", "idle_exit_obs_per_s", "ts_Pkg%pc6", "ts_PkgWatt",
     "ipmi_avg_W",
 ]
+
+
+TSC_MHZ_FALLBACK = [None]  # set from --tsc-mhz when turbostat output is unavailable
 
 
 def read_kv(path):
@@ -132,6 +135,9 @@ def parse_perf(path):
             ev = p[2]
             if ev.startswith("power/energy-") and ev.endswith("/"):
                 out[ev[len("power/energy-"):-1] + "_J"] = val
+            elif ev.startswith(("cstate_pkg/", "cstate_core/")) and ev.endswith("-residency/"):
+                dev, name = ev.rstrip("/").split("/")
+                out[("pkg_" if dev == "cstate_pkg" else "core_") + name.split("-")[0] + "_ticks"] = val
     return out
 
 
@@ -228,6 +234,12 @@ def run_metrics(d, deep_lat_us):
         row[k] = v
         row[k[:-2] + "_W"] = v / dur  # perf counted exactly while 'sleep dur' ran
     row.update(parse_turbostat(os.path.join(d, "turbostat.txt")))
+    # Hardware residency counters count TSC ticks per PMU instance (package / core).
+    tsc_hz = (row.get("ts_TSC_MHz") or TSC_MHZ_FALLBACK[0] or 0) * 1e6
+    for k in [k for k in row if k.endswith("_ticks")]:
+        n = int(meta.get("n_pkg" if k.startswith("pkg_") else "n_core", 0))
+        if tsc_hz and n:
+            row[k[:-6] + "_pct"] = row[k] / (tsc_hz * dur * n) * 100.0
     tr, tdur = parse_trace(os.path.join(d, "trace.txt")), float(meta.get("trace_dur", 0))
     if tdur > 0 and tr:
         row["idle_exit_total_per_s"] = tr.get("idle_exit_total", 0.0) / tdur
@@ -265,7 +277,10 @@ def main():
     ap.add_argument("--deep-latency-us", type=float, default=30.0,
                     help="cpuidle states with exit latency >= this count as deep (default 30: "
                          "C3 40us / C6 133us on Xeon E5 v4, C2 120us on ACPI idle; C1E 10us is shallow)")
+    ap.add_argument("--tsc-mhz", type=float, default=None,
+                    help="TSC frequency for hardware C-state %% when turbostat output is missing")
     args = ap.parse_args()
+    TSC_MHZ_FALLBACK[0] = args.tsc_mhz
 
     dirs = sorted(glob.glob(os.path.join(args.outdir, "raw", "*", "meta")))
     if not dirs:
