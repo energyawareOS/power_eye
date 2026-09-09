@@ -90,7 +90,21 @@ EVENTS=()
 for e in energy-pkg energy-cores energy-ram; do
     [ -e /sys/bus/event_source/devices/power/events/$e ] && EVENTS+=("power/$e/")
 done
+# Hardware C-state residency counters (TSC ticks), counted like RAPL: read once at exit.
+for dev in cstate_pkg cstate_core; do
+    for e in c2-residency c3-residency c6-residency c7-residency; do
+        [ -e /sys/bus/event_source/devices/$dev/events/$e ] && EVENTS+=("$dev/$e/")
+    done
+done
 EV=$(IFS=,; echo "${EVENTS[*]:-}")
+
+count_mask() { # number of CPUs in a cpumask file such as "0,12" or "0-3,8"
+    local n=""
+    [ -r "$1" ] && n=$(awk -F, '{for(i=1;i<=NF;i++){ if(split($i,a,"-")==2) n+=a[2]-a[1]+1; else n++ }} END{print n+0}' "$1")
+    echo "${n:-0}"
+}
+N_PKG=$(count_mask /sys/bus/event_source/devices/cstate_pkg/cpumask)
+N_CORE=$(count_mask /sys/bus/event_source/devices/cstate_core/cpumask)
 
 if [ -z "${BENCH_WINDOW_CMD:-}" ] && [ "$DRY" = 0 ]; then
     [ "$(id -u)" = 0 ] || die "must run as root (perf -a, turbostat, bpftrace)"
@@ -139,6 +153,8 @@ capture_env() {
             [ -r "$p" ] && echo "$p=$(<"$p")"
         done
         echo "power PMU cpumask=$(cat /sys/bus/event_source/devices/power/cpumask 2>&1)"
+        echo "cstate_pkg cpumask=$(cat /sys/bus/event_source/devices/cstate_pkg/cpumask 2>&1) (n_pkg=$N_PKG)"
+        echo "cstate_core cpumask=$(cat /sys/bus/event_source/devices/cstate_core/cpumask 2>&1) (n_core=$N_CORE)"
     } > "$OUT/env.txt"
 }
 
@@ -271,7 +287,8 @@ run_one() { # trial pos name cmd
     {
         echo "scenario=$name"; echo "trial=$trial"; echo "pos=$pos"
         echo "dur=$DUR"; echo "t0=$t0"; echo "t1=$t1"; echo "trace_dur=$tdur"
-        echo "obs_pid=$OBS_PID"; echo "obs_comm=$OBS_COMM"; echo "obs_nproc=$(wc -l < "$dir/pre.obs")"; echo "cmd=$cmd"
+        echo "obs_pid=$OBS_PID"; echo "obs_comm=$OBS_COMM"; echo "obs_nproc=$(wc -l < "$dir/pre.obs")"
+        echo "n_pkg=$N_PKG"; echo "n_core=$N_CORE"; echo "cmd=$cmd"
     } > "$dir/meta"
     stop_observer
     sleep "$COOLDOWN"
