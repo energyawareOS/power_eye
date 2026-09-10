@@ -303,6 +303,18 @@ def main():
             warnings.append("cpuidle states disabled by software on cpu0 (see env.txt): %s -- "
                             "deep residency cannot be observed in this configuration" % ", ".join(off))
     n = len(rows)
+    # Outlier runs: external activity during a window ruins a pairing (n is small).
+    pw = sorted(r["pkg_W"] for r in rows if "pkg_W" in r)
+    if len(pw) >= 5:
+        med = pw[len(pw) // 2] if len(pw) % 2 else (pw[len(pw) // 2 - 1] + pw[len(pw) // 2]) / 2
+        mad = sorted(abs(x - med) for x in pw)[len(pw) // 2]
+        lim = 3 * max(1.4826 * mad, 0.1)
+        for r in rows:
+            if "pkg_W" in r and abs(r["pkg_W"] - med) > lim:
+                warnings.append("trial %d %s: pkg_W %.2f W is an outlier (median %.2f W, idle entries "
+                                "%.0f/s); other activity during the window? see raw/%03d_%s"
+                                % (r["trial"], r["scenario"], r["pkg_W"], med,
+                                   r.get("idle_entries_per_s", float("nan")), r["trial"], r["scenario"]))
     for key, what in (("pkg_J", "RAPL energy (perf.csv missing or unparsable; see raw/*/window.log)"),
                       ("ts_Busy%", "turbostat summary (turbostat.txt missing or unparsable)")):
         miss = sum(1 for r in rows if key not in r)
