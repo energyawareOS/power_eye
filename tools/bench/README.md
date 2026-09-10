@@ -56,6 +56,13 @@ list of cpuidle states in `env.txt` shows their effect).
   Go/multi-threaded programs share across threads.
 - `summary.md` starts with a `Warnings` section (missing RAPL/turbostat data,
   observer not running, no deep C-state residency) -- read it before the tables.
+- cpuidle sysfs counters (`time`, `usage`) only update when a CPU leaves idle, so
+  a remote read misses the idle period in progress. `bench.sh` therefore reads
+  each CPU's counters from that CPU (`taskset`); before that fix residency read
+  up to ~3% too high on 30 s windows. The hardware counters (`core_c6_pct`,
+  `pkg_c*_pct`) have no such issue and are the reference for deep residency.
+- `summary.md` flags runs whose `pkg_W` is far from the median (other activity
+  in the window). With few trials one such run dominates the confidence interval.
 - A desktop with background activity has thousands of idle entries/s; effects
   smaller than that noise need long windows and many trials. Close other
   applications and fix the CPU governor/turbo setting before measuring.
