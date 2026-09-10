@@ -158,7 +158,29 @@ capture_env() {
     } > "$OUT/env.txt"
 }
 
-snap_idle() { # cpu state name usage time_us latency_us (tab separated)
+# cpu state name usage time_us latency_us (tab separated).
+# cpuidle time/usage are updated only when a CPU LEAVES idle, so a remote read
+# misses the idle period still in progress (on average ~1 s per CPU, which made
+# residency exceed 100% in short windows). Each CPU therefore reads its own
+# counters: the read wakes it and the counters are current.
+snap_idle() {
+    local d cpu
+    if ! command -v taskset >/dev/null; then snap_idle_remote "$1"; return; fi
+    for d in $SYS/cpu[0-9]*; do
+        cpu=${d##*cpu}
+        taskset -c "$cpu" awk -v cpu="$cpu" -v base="$d/cpuidle" 'BEGIN {
+            for (s = 0; ; s++) {
+                dir = base "/state" s
+                if ((getline name < (dir "/name")) <= 0) break
+                getline usage < (dir "/usage"); getline time < (dir "/time"); getline lat < (dir "/latency")
+                printf "%s\t%d\t%s\t%s\t%s\t%s\n", cpu, s, name, usage, time, lat
+                close(dir "/name"); close(dir "/usage"); close(dir "/time"); close(dir "/latency")
+            }
+        }' 2>/dev/null
+    done > "$1"
+}
+
+snap_idle_remote() { # fallback without taskset: biased high on short windows
     local d cpu st
     for d in $SYS/cpu[0-9]*/cpuidle/state[0-9]*; do
         cpu=${d#$SYS/cpu}; cpu=${cpu%%/*}; st=${d##*state}
