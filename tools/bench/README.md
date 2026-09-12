@@ -39,6 +39,29 @@ intel_idle parameters, governors, RAPL limits and DMI/BIOS info. **BIOS C-state
 options are not readable from the OS: always pass them with `--note`** (the
 list of cpuidle states in `env.txt` shows their effect).
 
+## Dose-response: energy per observer sample
+
+Run the same observer at several sample rates; `summary.md` then regresses
+package power on the rate (taken from the scenario's `-i <seconds>`, 0 for the
+baseline). The slope in mW/Hz is the energy of one sample in mJ, including the
+remote wakeups it causes (e.g. the IPI to each package's lead CPU that
+`energy_uj` reads trigger). Package power is noisy (~0.25 W between paired
+runs), so use rates that move it clearly and enough trials:
+
+```bash
+sudo tools/bench/bench.sh -o results/dose -d 300 -n 8 -s 30 --note "..." \
+     -S hz1='build/src/power_eye -i 1 -t 100000000 -f cE' \
+     -S hz5='build/src/power_eye -i 0.2 -t 100000000 -f cE' \
+     -S hz20='build/src/power_eye -i 0.05 -t 100000000 -f cE' \
+     -S hz100='build/src/power_eye -i 0.01 -t 100000000 -f cE'
+tools/bench/aggregate.py results/dose                 # all rates
+tools/bench/aggregate.py results/dose --max-rate 20   # low-rate region only
+```
+
+At high rates the CPUs stop reaching deep C-states and power saturates, so the
+relationship is not linear over the whole range. Compare the slope with
+different `--max-rate` values and use the low-rate one for the cost at 1 Hz.
+
 ## Caveats
 
 - **A passive exporter costs nothing until it is scraped.** Run node_exporter
