@@ -11,6 +11,7 @@ import csv
 import glob
 import math
 import os
+import re
 import statistics
 import sys
 
@@ -192,6 +193,36 @@ def parse_ipmi(path):
     return None
 
 
+def sample_rate_hz(meta):
+    """Observer sample rate from its '-i <seconds>' option; 0 for the idle baseline."""
+    cmd = meta.get("cmd", "")
+    if not cmd.strip():
+        return 0.0
+    m = re.search(r"(?:^|\s)-i\s*=?\s*([0-9]*\.?[0-9]+)", cmd)
+    if m and float(m.group(1)) > 0:
+        return 1.0 / float(m.group(1))
+    return None
+
+
+def ols(xs, ys):
+    """Least squares y = a + b x. Returns (a, b, ci95 of b, r2, n) or None."""
+    n = len(xs)
+    if n < 3:
+        return None
+    mx, my = statistics.fmean(xs), statistics.fmean(ys)
+    sxx = sum((x - mx) ** 2 for x in xs)
+    if sxx == 0:
+        return None
+    b = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / sxx
+    a = my - b * mx
+    sse = sum((y - a - b * x) ** 2 for x, y in zip(xs, ys))
+    sst = sum((y - my) ** 2 for y in ys)
+    df = n - 2
+    se = math.sqrt(sse / df / sxx) if df > 0 else float("nan")
+    t = T95[df - 1] if 1 <= df <= len(T95) else 1.96
+    return a, b, t * se, (1 - sse / sst) if sst else float("nan"), n
+
+
 def run_metrics(d, deep_lat_us):
     meta = read_kv(os.path.join(d, "meta"))
     outer = float(meta["t1"]) - float(meta["t0"])
@@ -206,7 +237,7 @@ def run_metrics(d, deep_lat_us):
     window = span("idle")
     row = {"scenario": meta["scenario"], "trial": int(meta["trial"]),
            "pos": int(meta.get("pos", 0)), "window_s": window,
-           "obs_comm": meta.get("obs_comm", "")}
+           "obs_comm": meta.get("obs_comm", ""), "rate_hz": sample_rate_hz(meta)}
     row.update(idle_metrics(read_idle(os.path.join(d, "pre.idle")),
                             read_idle(os.path.join(d, "post.idle")),
                             window, deep_lat_us))
@@ -277,6 +308,9 @@ def main():
     ap.add_argument("--deep-latency-us", type=float, default=30.0,
                     help="cpuidle states with exit latency >= this count as deep (default 30: "
                          "C3 40us / C6 133us on Xeon E5 v4, C2 120us on ACPI idle; C1E 10us is shallow)")
+    ap.add_argument("--max-rate", type=float, default=None,
+                    help="dose-response fit uses only runs with sample rate <= this (Hz); "
+                         "at high rates deep C-states are lost and power saturates")
     ap.add_argument("--tsc-mhz", type=float, default=None,
                     help="TSC frequency for hardware C-state %% when turbostat output is missing")
     args = ap.parse_args()
@@ -381,6 +415,30 @@ def main():
                 star = "*" if mm is not None and ci is not None and abs(mm) > ci else ""
                 cells.append(fmt(mm, ci) + star)
             lines.append("| %s | %d | %s |" % (s, len(sr), " | ".join(cells)))
+    # Dose-response: package power against the observer's sample rate (slope = J per sample).
+    fit_rows = [r for r in rows if r.get("rate_hz") is not None and "pkg_W" in r
+                and (args.max_rate is None or r["rate_hz"] <= args.max_rate)]
+    rates = sorted({r["rate_hz"] for r in fit_rows})
+    if len(rates) >= 3:
+        lines += ["", "## Dose-response (observer sample rate -> package power)", "",
+                  "Rates in the fit: %s Hz%s. Slope is the energy cost of one observer sample "
+                  "(timer wake plus the remote wakeups it causes)." %
+                  (", ".join("%g" % x for x in rates),
+                   "" if args.max_rate is None else " (limited by --max-rate %g)" % args.max_rate),
+                  "", "| response | intercept | slope per Hz | 95% CI | R² | runs |", "|---|---|---|---|---|---|"]
+        for key, scale, unit in (("pkg_W", 1000.0, "mW/Hz = mJ/sample"),
+                                 ("core_c6_pct", 1.0, "%-points/Hz"),
+                                 ("idle_entries_per_s", 1.0, "entries/s per Hz")):
+            pts = [(r["rate_hz"], r[key]) for r in fit_rows if key in r]
+            fit = ols([p[0] for p in pts], [p[1] for p in pts]) if pts else None
+            if fit:
+                a, b, ci, r2, n = fit
+                lines.append("| %s | %.3f | %.3f %s | ± %.3f%s | %s | %d |" %
+                             (key, a, b * scale, unit, ci * scale,
+                              "" if abs(b) > ci else " (n.s.)",
+                              "-" if r2 != r2 else "%.2f" % r2, n))
+        lines += ["", "Check linearity before trusting the slope: compare fits with `--max-rate` "
+                  "set to the lower and upper half of the rates."]
     lines += ["", "_Trace-pass metrics (`idle_exit_*`) come from a separate perturbing "
               "bpftrace window and are not comparable to power numbers._", ""]
     with open(os.path.join(args.outdir, "summary.md"), "w") as f:

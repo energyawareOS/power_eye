@@ -16,13 +16,13 @@ def write(path, text):
         f.write(text)
 
 
-def make_run(out, trial, scen, pkg_j, c6_us, entries, vol0, vol1, trace=None):
+def make_run(out, trial, scen, pkg_j, c6_us, entries, vol0, vol1, trace=None, cmd=""):
     d = os.path.join(out, "raw", "%03d_%s" % (trial, scen))
     os.makedirs(d)
     write(os.path.join(d, "meta"),
           "scenario=%s\ntrial=%d\npos=1\ndur=100\nt0=1000.0\nt1=%.1f\n"
-          "trace_dur=%d\nobs_pid=1\nobs_comm=x\ncmd=\nn_pkg=2\nn_core=24\n" %
-          (scen, trial, 1000.0 + WINDOW + 3.0, 10 if trace else 0))  # outer window is 3 s longer
+          "trace_dur=%d\nobs_pid=1\nobs_comm=x\ncmd=%s\nn_pkg=2\nn_core=24\n" %
+          (scen, trial, 1000.0 + WINDOW + 3.0, 10 if trace else 0, cmd))  # outer window is 3 s longer
     # snapshots span exactly WINDOW even though the outer window is longer
     write(os.path.join(d, "times"),
           "pre.obs 999.0 1001.0\npost.obs 1099.0 1101.0\n"
@@ -83,6 +83,28 @@ class AggregateTest(unittest.TestCase):
             self.assertIn("Paired difference", summary)
             self.assertIn("1.000", summary)  # 100 J more over 100 s -> +1.000 W
             self.assertRegex(summary, r"1\.000 ± 0\.000\*")
+
+
+class DoseResponseTest(unittest.TestCase):
+    def test_slope_is_energy_per_sample(self):
+        with tempfile.TemporaryDirectory() as out:
+            # 45 W idle + 0.02 W per Hz of sampling (= 20 mJ per sample), tiny jitter
+            for t in (1, 2, 3):
+                for name, cmd, hz in (("none", "", 0), ("r1", "build/src/power_eye -i 1 -f cE", 1),
+                                      ("r10", "build/src/power_eye -i 0.1 -f cE", 10),
+                                      ("r50", "build/src/power_eye -i 0.02 -f cE", 50)):
+                    make_run(out, t, name, (45.0 + 0.02 * hz + 0.001 * t) * 100, 90_000_000, 200, 0, 0, cmd=cmd)
+            subprocess.run([sys.executable, os.path.join(HERE, "aggregate.py"), out],
+                           check=True, stdout=subprocess.DEVNULL)
+            with open(os.path.join(out, "summary.md")) as f:
+                text = f.read()
+            self.assertIn("Dose-response", text)
+            self.assertIn("Rates in the fit: 0, 1, 10, 50 Hz", text)
+            self.assertRegex(text, r"\| pkg_W \| 45\.00\d \| 20\.0\d\d mW/Hz = mJ/sample")
+            subprocess.run([sys.executable, os.path.join(HERE, "aggregate.py"), out, "--max-rate", "10"],
+                           check=True, stdout=subprocess.DEVNULL)
+            with open(os.path.join(out, "summary.md")) as f:
+                self.assertIn("Rates in the fit: 0, 1, 10 Hz (limited", f.read())
 
 
 class OutlierTest(unittest.TestCase):
