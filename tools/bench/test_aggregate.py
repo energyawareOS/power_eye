@@ -119,6 +119,21 @@ class OutlierTest(unittest.TestCase):
             self.assertIn("trial 5 none: pkg_W 8.00 W is an outlier", text)
             self.assertNotIn("trial 1 none: pkg_W", text)
 
+    def test_shifted_scenario_is_not_an_outlier(self):
+        # a scenario that shifts power as a whole is judged against itself
+        with tempfile.TemporaryDirectory() as out:
+            for t, j in enumerate((500.0, 501.0, 500.5, 502.0, 500.8), 1):
+                make_run(out, t, "none", j, 90_000_000, 200, 0, 0)
+            for t, j in enumerate((700.0, 701.0, 700.5, 702.0, 900.0), 1):
+                make_run(out, t, "fast", j, 90_000_000, 200, 0, 0)
+            subprocess.run([sys.executable, os.path.join(HERE, "aggregate.py"), out],
+                           check=True, stdout=subprocess.DEVNULL)
+            with open(os.path.join(out, "summary.md")) as f:
+                text = f.read()
+            self.assertIn("trial 5 fast: pkg_W 9.00 W is an outlier", text)
+            self.assertNotIn("trial 1 fast: pkg_W", text)
+            self.assertNotIn("none: pkg_W", text)
+
 
 if __name__ == "__main__":
     unittest.main()
