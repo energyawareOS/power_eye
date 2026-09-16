@@ -230,7 +230,12 @@ start_observer() { # name cmd dir
     setsid bash -c "exec $2" > "$3/obs.log" 2>&1 &
     OBS_PID=$!
     sleep 1
-    kill -0 "$OBS_PID" 2>/dev/null || { echo "observer '$1' died; see $3/obs.log" >&2; OBS_PID=""; return 1; }
+    kill -0 "$OBS_PID" 2>/dev/null || {
+        echo "observer '$1' died within 1 s; command: $2" >&2
+        if [ -s "$3/obs.log" ]; then tail -n 5 "$3/obs.log" | sed 's/^/    obs.log: /' >&2
+        else echo "    obs.log is empty (wrong path or not in PATH? try an absolute path)" >&2; fi
+        OBS_PID=""; return 1
+    }
     OBS_COMM=$(obs_comms "$OBS_PID")
     [ -n "$OBS_COMM" ] || OBS_COMM=$(<"/proc/$OBS_PID/comm")
 }
@@ -343,6 +348,16 @@ if [ "$DRY" = 0 ] && [ -z "${BENCH_WINDOW_CMD:-}" ]; then
         die "fix the above, or try --no-turbostat"
     fi
     DUR=$DUR_SAVE
+    # Every observer must start too, otherwise a typo only shows up after
+    # the first (shuffled) trial of a long experiment.
+    for i in "${!SC_NAME[@]}"; do
+        [ -n "${SC_CMD[$i]}" ] || continue
+        if ! start_observer "${SC_NAME[$i]}" "${SC_CMD[$i]}" "$pf"; then
+            stop_observer
+            die "scenario '${SC_NAME[$i]}': observer does not start (see above)"
+        fi
+        stop_observer
+    done
     rm -rf "$pf"
 fi
 
