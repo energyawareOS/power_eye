@@ -1,0 +1,65 @@
+2 package(s), min interval 100 ms, print every 1.0 s, energy unit 2.328e-10 J
+t=   1.0s | pkg0: (baseline) age   60 ms | pkg1: (baseline) age    0 ms | idle exits    596/s | prog   1192 runs/s avg  497 ns
+t=   2.0s | pkg0:  14.96 W c6  83.0% reads 10.0/s age   16 ms | pkg1:  11.41 W c6  83.4% reads  7.0/s age   90 ms | idle exits    476/s | prog    952 runs/s avg  577 ns
+t=   3.0s | pkg0:  14.36 W c6  88.2% reads  9.0/s age   41 ms | pkg1:  10.89 W c6  88.0% reads  8.0/s age    0 ms | idle exits    203/s | prog    406 runs/s avg  708 ns
+t=   4.0s | pkg0:  14.36 W c6  87.9% reads  8.0/s age   97 ms | pkg1:  10.93 W c6  87.8% reads  7.0/s age   27 ms | idle exits    207/s | prog    414 runs/s avg  644 ns
+t=   5.0s | pkg0:  14.16 W c6  89.8% reads  8.0/s age   75 ms | pkg1:  10.62 W c6  90.4% reads  7.0/s age   89 ms | idle exits    113/s | prog    227 runs/s avg  748 ns
+t=   6.0s | pkg0:  14.28 W c6  88.2% reads  9.0/s age   54 ms | pkg1:  10.84 W c6  88.3% reads  8.0/s age   49 ms | idle exits    205/s | prog    409 runs/s avg  689 ns
+t=   7.0s | pkg0:  14.15 W c6  90.1% reads  9.0/s age   13 ms | pkg1:  10.66 W c6  90.2% reads  7.0/s age   12 ms | idle exits    138/s | prog    276 runs/s avg  739 ns
+t=   8.0s | pkg0:  14.30 W c6  89.6% reads  9.0/s age    6 ms | pkg1:  10.73 W c6  89.7% reads  6.0/s age    0 ms | idle exits    124/s | prog    248 runs/s avg  769 ns
+t=   9.0s | pkg0:  14.12 W c6  90.0% reads  8.0/s age   97 ms | pkg1:  10.71 W c6  89.9% reads  6.0/s age   36 ms | idle exits    140/s | prog    280 runs/s avg  708 ns
+t=  10.0s | pkg0:  14.33 W c6  88.6% reads  9.0/s age  110 ms | pkg1:  10.84 W c6  88.7% reads  8.0/s age    0 ms | idle exits    186/s | prog    373 runs/s avg  713 ns
+t=  11.0s | pkg0:  14.22 W c6  89.3% reads 10.0/s age   11 ms | pkg1:  10.73 W c6  89.6% reads  7.0/s age   58 ms | idle exits    145/s | prog    289 runs/s avg  716 ns
+t=  12.0s | pkg0:  14.25 W c6  89.0% reads  8.0/s age   18 ms | pkg1:  10.79 W c6  88.9% reads  6.0/s age   18 ms | idle exits    154/s | prog    308 runs/s avg  674 ns
+t=  13.0s | pkg0:  14.15 W c6  90.4% reads  8.0/s age   12 ms | pkg1:  10.66 W c6  90.4% reads  7.0/s age    0 ms | idle exits    114/s | prog    228 runs/s avg  762 ns
+t=  14.0s | pkg0:  14.36 W c6  88.1% reads  9.0/s age   12 ms | pkg1:  10.81 W c6  88.5% reads  6.0/s age   84 ms | idle exits    218/s | prog    436 runs/s avg  657 ns
+t=  15.0s | pkg0:  14.35 W c6  88.2% reads  8.0/s age  106 ms | pkg1:  10.92 W c6  88.1% reads  9.0/s age    0 ms | idle exits    181/s | prog    362 runs/s avg  701 ns
+t=  16.0s | pkg0:  14.28 W c6  89.1% reads  9.0/s age  107 ms | pkg1:  10.73 W c6  89.0% reads  8.0/s age    0 ms | idle exits    167/s | prog    334 runs/s avg  713 ns
+t=  17.0s | pkg0:  14.21 W c6  89.2% reads  9.0/s age   25 ms | pkg1:  10.78 W c6  89.3% reads  6.0/s age   27 ms | idle exits    150/s | prog    300 runs/s avg  710 ns
+t=  18.0s | pkg0:  14.33 W c6  88.6% reads  8.0/s age  125 ms | pkg1:  10.85 W c6  88.7% reads  7.0/s age   68 ms | idle exits    183/s | prog    366 runs/s avg  683 ns
+t=  19.0s | pkg0:  14.27 W c6  89.1% reads  9.0/s age   26 ms | pkg1:  10.77 W c6  89.4% reads  7.0/s age   38 ms | idle exits    203/s | prog    407 runs/s avg  702 ns
+t=  20.0s | pkg0:  14.26 W c6  88.6% reads  8.0/s age   99 ms | pkg1:  10.88 W c6  88.5% reads  7.0/s age   28 ms | idle exits    177/s | prog    353 runs/s avg  681 ns
+t=  21.0s | pkg0:  14.39 W c6  88.2% reads  9.0/s age  102 ms | pkg1:  10.96 W c6  88.0% reads  8.0/s age   99 ms | idle exits    266/s | prog    532 runs/s avg  594 ns
+t=  22.0s | pkg0:  14.33 W c6  87.6% reads 10.0/s age    0 ms | pkg1:  10.95 W c6  87.5% reads  8.0/s age   37 ms | idle exits    192/s | prog    384 runs/s avg  686 ns
+t=  23.0s | pkg0:  14.24 W c6  88.9% reads  8.0/s age   71 ms | pkg1:  10.76 W c6  89.1% reads  7.0/s age    0 ms | idle exits    163/s | prog    326 runs/s avg  696 ns
+t=  24.0s | pkg0:  14.29 W c6  89.0% reads  9.0/s age   57 ms | pkg1:  10.84 W c6  89.0% reads  7.0/s age    0 ms | idle exits    170/s | prog    340 runs/s avg  703 ns
+t=  25.0s | pkg0:  14.25 W c6  90.0% reads  8.0/s age   87 ms | pkg1:  10.63 W c6  90.0% reads  7.0/s age    0 ms | idle exits    128/s | prog    255 runs/s avg  725 ns
+t=  26.0s | pkg0:  14.22 W c6  88.9% reads  9.0/s age   91 ms | pkg1:  10.87 W c6  88.9% reads  7.0/s age   85 ms | idle exits    186/s | prog    373 runs/s avg  687 ns
+t=  27.0s | pkg0:  14.29 W c6  89.3% reads  9.0/s age   61 ms | pkg1:  10.72 W c6  89.3% reads  8.0/s age    0 ms | idle exits    153/s | prog    306 runs/s avg  722 ns
+t=  28.0s | pkg0:  14.16 W c6  89.9% reads  8.0/s age   53 ms | pkg1:  10.75 W c6  89.9% reads  7.0/s age    6 ms | idle exits    122/s | prog    245 runs/s avg  736 ns
+t=  29.0s | pkg0:  14.21 W c6  89.7% reads  8.0/s age   85 ms | pkg1:  10.72 W c6  89.6% reads  5.0/s age   40 ms | idle exits    145/s | prog    289 runs/s avg  684 ns
+t=  30.0s | pkg0:  14.39 W c6  88.0% reads  9.0/s age   55 ms | pkg1:  10.84 W c6  88.4% reads  7.0/s age    0 ms | idle exits    213/s | prog    426 runs/s avg  664 ns
+t=  31.0s | pkg0:  14.34 W c6  88.5% reads  9.0/s age   79 ms | pkg1:  10.83 W c6  88.4% reads  5.0/s age   95 ms | idle exits    231/s | prog    462 runs/s avg  678 ns
+t=  32.0s | pkg0:  14.52 W c6  85.9% reads 10.0/s age   67 ms | pkg1:  11.14 W c6  85.8% reads  7.0/s age   79 ms | idle exits    261/s | prog    522 runs/s avg  636 ns
+t=  33.0s | pkg0:  14.57 W c6  86.6% reads 10.0/s age   55 ms | pkg1:  11.01 W c6  86.7% reads  6.0/s age   71 ms | idle exits    250/s | prog    500 runs/s avg  639 ns
+t=  34.0s | pkg0:  14.47 W c6  86.9% reads 10.0/s age   43 ms | pkg1:  11.04 W c6  86.9% reads  7.0/s age   63 ms | idle exits    257/s | prog    514 runs/s avg  648 ns
+t=  35.0s | pkg0:  14.43 W c6  87.3% reads 10.0/s age   30 ms | pkg1:  10.97 W c6  87.4% reads  8.0/s age    0 ms | idle exits    235/s | prog    470 runs/s avg  661 ns
+t=  36.0s | pkg0:  14.37 W c6  87.6% reads 10.0/s age   19 ms | pkg1:  10.98 W c6  87.4% reads  6.0/s age    0 ms | idle exits    239/s | prog    478 runs/s avg  645 ns
+t=  37.0s | pkg0:  14.46 W c6  87.6% reads 10.0/s age    7 ms | pkg1:  10.89 W c6  87.9% reads  7.0/s age   70 ms | idle exits    220/s | prog    440 runs/s avg  666 ns
+t=  38.0s | pkg0:  14.46 W c6  87.5% reads  9.0/s age   96 ms | pkg1:  10.94 W c6  87.8% reads  6.0/s age   32 ms | idle exits    233/s | prog    466 runs/s avg  700 ns
+t=  39.0s | pkg0:  14.37 W c6  87.0% reads 10.0/s age   82 ms | pkg1:  10.98 W c6  86.8% reads  7.0/s age   40 ms | idle exits    264/s | prog    528 runs/s avg  655 ns
+t=  40.0s | pkg0:  14.58 W c6  86.4% reads 10.0/s age   71 ms | pkg1:  11.07 W c6  86.6% reads  7.0/s age   17 ms | idle exits    264/s | prog    528 runs/s avg  661 ns
+t=  41.0s | pkg0:  14.44 W c6  87.7% reads 10.0/s age   57 ms | pkg1:  10.95 W c6  87.6% reads  8.0/s age    9 ms | idle exits    241/s | prog    482 runs/s avg  658 ns
+t=  42.0s | pkg0:  14.41 W c6  87.1% reads 10.0/s age   44 ms | pkg1:  10.98 W c6  87.1% reads  6.0/s age   73 ms | idle exits    254/s | prog    508 runs/s avg  644 ns
+t=  43.0s | pkg0:  14.58 W c6  86.2% reads 10.0/s age   22 ms | pkg1:  11.07 W c6  86.4% reads  7.0/s age   89 ms | idle exits    274/s | prog    548 runs/s avg  670 ns
+t=  44.0s | pkg0:  14.48 W c6  87.3% reads 10.0/s age    9 ms | pkg1:  10.96 W c6  87.3% reads  7.0/s age    2 ms | idle exits    233/s | prog    466 runs/s avg  652 ns
+t=  45.0s | pkg0:  14.43 W c6  87.7% reads  9.0/s age  100 ms | pkg1:  10.99 W c6  87.3% reads  7.0/s age   61 ms | idle exits    250/s | prog    500 runs/s avg  638 ns
+t=  46.0s | pkg0:  14.55 W c6  85.9% reads 10.0/s age   86 ms | pkg1:  11.07 W c6  86.3% reads  8.0/s age    0 ms | idle exits    282/s | prog    564 runs/s avg  690 ns
+t=  47.0s | pkg0:  14.60 W c6  86.1% reads 10.0/s age   71 ms | pkg1:  11.09 W c6  86.2% reads  7.0/s age   82 ms | idle exits    292/s | prog    584 runs/s avg  637 ns
+t=  48.0s | pkg0:  14.50 W c6  86.9% reads 10.0/s age   57 ms | pkg1:  11.03 W c6  86.9% reads  8.0/s age    8 ms | idle exits    263/s | prog    526 runs/s avg  651 ns
+t=  49.0s | pkg0:  14.61 W c6  86.0% reads 10.0/s age   44 ms | pkg1:  11.09 W c6  86.4% reads  7.0/s age   72 ms | idle exits    285/s | prog    569 runs/s avg  636 ns
+t=  50.0s | pkg0:  14.58 W c6  86.3% reads 10.0/s age   30 ms | pkg1:  11.09 W c6  86.1% reads  7.0/s age    0 ms | idle exits    293/s | prog    587 runs/s avg  630 ns
+t=  51.0s | pkg0:  14.59 W c6  85.6% reads 10.0/s age   17 ms | pkg1:  11.24 W c6  85.5% reads  7.0/s age    0 ms | idle exits    298/s | prog    596 runs/s avg  641 ns
+t=  52.0s | pkg0:  14.38 W c6  87.3% reads 10.0/s age    5 ms | pkg1:  10.91 W c6  87.6% reads  5.0/s age   91 ms | idle exits    223/s | prog    446 runs/s avg  647 ns
+t=  53.0s | pkg0:  14.56 W c6  86.4% reads  9.0/s age   94 ms | pkg1:  11.09 W c6  86.3% reads  7.0/s age   52 ms | idle exits    258/s | prog    516 runs/s avg  640 ns
+t=  54.0s | pkg0:  14.51 W c6  86.5% reads 10.0/s age   31 ms | pkg1:  11.05 W c6  86.7% reads  6.0/s age   84 ms | idle exits    265/s | prog    530 runs/s avg  665 ns
+t=  55.0s | pkg0:  14.34 W c6  88.3% reads  9.0/s age   71 ms | pkg1:  10.86 W c6  88.4% reads  9.0/s age   12 ms | idle exits    186/s | prog    372 runs/s avg  706 ns
+t=  56.0s | pkg0:  14.30 W c6  89.7% reads  9.0/s age   72 ms | pkg1:  10.66 W c6  89.7% reads  6.0/s age   72 ms | idle exits    128/s | prog    256 runs/s avg  739 ns
+t=  57.0s | pkg0:  14.24 W c6  88.8% reads  9.0/s age   24 ms | pkg1:  10.87 W c6  88.8% reads  7.0/s age    0 ms | idle exits    178/s | prog    356 runs/s avg  691 ns
+t=  58.0s | pkg0:  14.34 W c6  89.1% reads  8.0/s age    4 ms | pkg1:  10.76 W c6  89.1% reads  6.0/s age    0 ms | idle exits    176/s | prog    352 runs/s avg  677 ns
+t=  59.0s | pkg0:  14.20 W c6  89.4% reads  8.0/s age   81 ms | pkg1:  10.76 W c6  89.5% reads  7.0/s age   44 ms | idle exits    160/s | prog    320 runs/s avg  690 ns
+t=  60.0s | pkg0:  14.40 W c6  88.2% reads  9.0/s age   35 ms | pkg1:  10.89 W c6  88.2% reads  8.0/s age    0 ms | idle exits    165/s | prog    330 runs/s avg  704 ns
+
+BPF-derived mean power vs direct read() of the same perf event:
+  pkg0: bpf 14.38 W over 59.0 s (540 samples), direct 14.39 W over 60.0 s, diff -0.09%
+  pkg1: bpf 10.90 W over 59.0 s (411 samples), direct 10.91 W over 60.0 s, diff -0.14%
