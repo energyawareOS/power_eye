@@ -14,6 +14,7 @@ per package, opened on its lead CPU, is enough).
     make
     sudo ./idle_sampler -i 1 -m 100 -t 60
 
+- `-o` BPF object (default: `idle_sampler.bpf.o` next to the executable)
 - `-i` print interval (s), `-m` minimum interval between BPF samples per
   package (ms, default 100), `-t` total run time (s, default: until Ctrl-C).
 

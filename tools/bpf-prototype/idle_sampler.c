@@ -138,7 +138,8 @@ static unsigned long long direct_read(int fd)
 
 int main(int argc, char **argv)
 {
-    const char *obj_path = "idle_sampler.bpf.o";
+    const char *obj_path = NULL;
+    char obj_default[4096];
     double print_sec = 1.0;
     unsigned long long min_ms = 100, total_sec = 0;
     int opt;
@@ -151,6 +152,17 @@ int main(int argc, char **argv)
         else return 2;
     }
     if (print_sec < 0.1) { fprintf(stderr, "-i must be >= 0.1\n"); return 2; }
+    if (!obj_path) {
+        /* default: next to the executable, so it works from any directory */
+        ssize_t n = readlink("/proc/self/exe", obj_default, sizeof obj_default - 32);
+        char *slash = n > 0 ? memrchr(obj_default, '/', n) : NULL;
+        if (slash) {
+            strcpy(slash + 1, "idle_sampler.bpf.o");
+            obj_path = obj_default;
+        } else {
+            obj_path = "idle_sampler.bpf.o";
+        }
+    }
 
     /* packages and their lead CPUs */
     int lead[MAXPKG], nlead = lead_cpus("power", lead, MAXPKG);
