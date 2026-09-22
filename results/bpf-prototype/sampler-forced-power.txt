@@ -1,0 +1,18 @@
+2 package(s), min interval 1000000 ms, print every 5.0 s, energy unit 2.328e-10 J
+safety timer: forced sample when a package's last sample is older than 10 s (cap 20 s)
+t=   5.0s | pkg0: (baseline) age 5002 ms | pkg1: (baseline) age 5002 ms | idle exits    299/s | prog    598 runs/s avg  489 ns
+t=  10.0s | pkg0:  14.41 W c6  87.6% reads  0.2/s age 18446744073710 ms forced 1 | pkg1:  10.89 W c6  87.6% reads  0.2/s age 18446744073709 ms forced 1 | idle exits    175/s | prog    350 runs/s avg  549 ns
+t=  15.0s | pkg0: (no new sample) age 5000 ms forced 1 | pkg1: (no new sample) age 5000 ms forced 1 | idle exits    188/s | prog    377 runs/s avg  553 ns
+t=  20.0s | pkg0:  14.28 W c6  88.9% reads  0.2/s age 18446744073709 ms forced 2 | pkg1:  10.75 W c6  88.9% reads  0.2/s age 18446744073709 ms forced 2 | idle exits    164/s | prog    328 runs/s avg  556 ns
+t=  25.0s | pkg0: (no new sample) age 5000 ms forced 2 | pkg1: (no new sample) age 5000 ms forced 2 | idle exits    161/s | prog    322 runs/s avg  556 ns
+t=  30.0s | pkg0:  14.25 W c6  89.1% reads  0.2/s age 18446744073709 ms forced 3 | pkg1:  10.73 W c6  89.1% reads  0.2/s age 18446744073709 ms forced 3 | idle exits    166/s | prog    332 runs/s avg  557 ns
+t=  35.0s | pkg0: (no new sample) age 5000 ms forced 3 | pkg1: (no new sample) age 5000 ms forced 3 | idle exits    167/s | prog    334 runs/s avg  554 ns
+t=  40.0s | pkg0:  14.26 W c6  88.9% reads  0.2/s age 18446744073709 ms forced 4 | pkg1:  10.74 W c6  89.0% reads  0.2/s age 18446744073709 ms forced 4 | idle exits    177/s | prog    354 runs/s avg  557 ns
+t=  45.0s | pkg0: (no new sample) age 5000 ms forced 4 | pkg1: (no new sample) age 5000 ms forced 4 | idle exits    178/s | prog    356 runs/s avg  559 ns
+t=  50.0s | pkg0:  14.27 W c6  88.7% reads  0.2/s age 18446744073709 ms forced 5 | pkg1:  10.74 W c6  88.7% reads  0.2/s age 18446744073709 ms forced 5 | idle exits    197/s | prog    393 runs/s avg  562 ns
+t=  55.0s | pkg0: (no new sample) age 5000 ms forced 5 | pkg1: (no new sample) age 5000 ms forced 5 | idle exits   2140/s | prog   4280 runs/s avg  221 ns
+t=  60.0s | pkg0:  15.83 W c6  72.7% reads  0.2/s age 18446744073709 ms forced 6 | pkg1:  12.36 W c6  72.7% reads  0.2/s age 18446744073709 ms forced 6 | idle exits    193/s | prog    385 runs/s avg  553 ns
+
+BPF-derived mean power vs direct read() of the same perf event:
+  pkg0: bpf 14.55 W over 60.0 s (6 samples), direct 14.55 W over 60.0 s, diff +0.00%
+  pkg1: bpf 11.04 W over 60.0 s (6 samples), direct 11.04 W over 60.0 s, diff +0.00%

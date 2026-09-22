@@ -309,6 +309,7 @@ int main(int argc, char **argv)
             if (age >= eff_age / 2)
                 force_sample(first_cpu[i]);
         }
+        t = now_ns();    /* after forcing: samples may be newer than the first t */
         if ((t - t_prev) / 1e9 < print_sec - 0.05) {
             if (total_sec && (t - t_start) / 1000000000ULL >= total_sec)
                 break;
@@ -324,7 +325,7 @@ int main(int argc, char **argv)
                 continue;
             }
             if (!have_first[i]) { first[i] = cur[i]; have_first[i] = 1; }
-            double age_ms = (t - cur[i].ts_ns) / 1e6;
+            double age_ms = cur[i].ts_ns < t ? (t - cur[i].ts_ns) / 1e6 : 0;
             if (prev[i].ts_ns && cur[i].ts_ns > prev[i].ts_ns) {
                 double span = (cur[i].ts_ns - prev[i].ts_ns) / 1e9;
                 double w = (cur[i].energy - prev[i].energy) * scale / span;
