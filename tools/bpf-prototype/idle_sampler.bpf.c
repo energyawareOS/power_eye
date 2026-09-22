@@ -47,15 +47,52 @@ struct {
     __uint(max_entries, MAXCPU);
 } idle_exits SEC(".maps");           /* per CPU: only its own CPU writes */
 
+/* Take one sample for package pkg. Idle exits are rate limited by
+ * min_interval; a forced sample (safety timer) ignores the interval. Either
+ * way only one CPU wins the claim, so there is a single writer at a time. */
+static __always_inline void take_sample(__u32 pkg, struct sampler_cfg *c, int force)
+{
+    struct bpf_perf_event_value ve = {}, vc = {};
+    struct pkg_state *st;
+    __u64 now, last;
+    long ret;
+
+    if (pkg >= MAXPKG)
+        return;
+    st = bpf_map_lookup_elem(&pkg_state, &pkg);
+    if (!st)
+        return;
+    now = bpf_ktime_get_ns();
+    last = st->last_claim_ns;
+    if (!force && now - last < c->min_interval_ns)
+        return;
+    if (__sync_val_compare_and_swap(&st->last_claim_ns, last, now) != last)
+        return;
+
+    ret = bpf_perf_event_read_value(&ev_energy, pkg, &ve, sizeof(ve));
+    if (!ret && c->use_c6)
+        ret = bpf_perf_event_read_value(&ev_c6, pkg, &vc, sizeof(vc));
+    if (ret) {
+        st->errors++;
+        st->last_err = ret;
+        return;
+    }
+    __sync_fetch_and_add(&st->seq, 1);       /* odd: writing */
+    st->ts_ns = now;
+    st->energy = ve.counter;
+    st->c6 = vc.counter;
+    st->reads++;
+    if (force)
+        st->forced++;
+    __sync_fetch_and_add(&st->seq, 1);       /* even: stable */
+}
+
 SEC("raw_tp/cpu_idle")
 int on_idle(struct bpf_raw_tracepoint_args *ctx)
 {
     __u32 zero = 0, cpu, *pk;
     struct sampler_cfg *c;
-    struct pkg_state *st;
-    struct bpf_perf_event_value ve = {}, vc = {};
-    __u64 now, last, *ex;
-    long ret;
+    __u64 *ex;
 
     if ((__u32)ctx->args[0] != (__u32)-1)    /* PWR_EVENT_EXIT: leaving idle */
         return 0;
@@ -67,40 +104,24 @@ int on_idle(struct bpf_raw_tracepoint_args *ctx)
 
     pk = bpf_map_lookup_elem(&pkg_of_cpu, &cpu);
     c = bpf_map_lookup_elem(&cfg, &zero);
-    if (!pk || !c || *pk >= MAXPKG)
-        return 0;
-    st = bpf_map_lookup_elem(&pkg_state, pk);
-    if (!st)
-        return 0;
+    if (pk && c)
+        take_sample(*pk, c, 0);
+    return 0;
+}
 
-    now = bpf_ktime_get_ns();
-    last = st->last_claim_ns;
-    if (now - last < c->min_interval_ns)
-        return 0;
-    /* only one CPU of the package wins this interval */
-    if (__sync_val_compare_and_swap(&st->last_claim_ns, last, now) != last)
-        return 0;
+/* Safety timer hook: the loader pins itself to a CPU of a stale package and
+ * calls getppid(); the sample is then taken on that CPU. */
+SEC("tracepoint/syscalls/sys_enter_getppid")
+int on_force(void *ctx)
+{
+    __u32 zero = 0, cpu = bpf_get_smp_processor_id(), *pk;
+    struct sampler_cfg *c = bpf_map_lookup_elem(&cfg, &zero);
 
-    ret = bpf_perf_event_read_value(&ev_energy, *pk, &ve, sizeof(ve));
-    if (ret) {
-        st->errors++;
-        st->last_err = ret;
+    if (!c || (bpf_get_current_pid_tgid() >> 32) != c->loader_tgid)
         return 0;
-    }
-    if (c->use_c6) {
-        ret = bpf_perf_event_read_value(&ev_c6, *pk, &vc, sizeof(vc));
-        if (ret) {
-            st->errors++;
-            st->last_err = ret;
-            return 0;
-        }
-    }
-    __sync_fetch_and_add(&st->seq, 1);       /* odd: writing */
-    st->ts_ns = now;
-    st->energy = ve.counter;
-    st->c6 = vc.counter;
-    st->reads++;
-    __sync_fetch_and_add(&st->seq, 1);       /* even: stable */
+    pk = bpf_map_lookup_elem(&pkg_of_cpu, &cpu);
+    if (pk)
+        take_sample(*pk, c, 1);
     return 0;
 }
 

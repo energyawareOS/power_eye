@@ -16,12 +16,13 @@ struct pkg_state {
     __u64 last_claim_ns;  /* rate limiter */
     __u64 reads;          /* samples taken */
     __u64 errors;         /* failed bpf_perf_event_read_value() calls */
+    __u64 forced;         /* samples taken on request of the safety timer */
     __s64 last_err;
 };
 
 struct sampler_cfg {
     __u64 min_interval_ns;
     __u32 use_c6;
-    __u32 pad;
+    __u32 loader_tgid;    /* only this process may force a sample */
 };
 #endif
