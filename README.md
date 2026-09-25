@@ -68,6 +68,7 @@ Options:
   - `G`: Include per-GPU columns; implies `g`
   - `E`: Include energy `(J)` columns in addition to power `(W)`
   - `H`: Print a one-line header describing the output columns
+  - `o`: Report the cost of the observation itself (see below)
 - `-h`: Show help and exit
 
 ## Output Schema
@@ -125,6 +126,17 @@ Options:
     ... PID<n>-CPU(W) [PID<n>-CPU(J)] PID<n>-GPU(W) [PID<n>-GPU(J)] ...
     ```
   Per-pid GPU values are derived from `nvmlDeviceGetProcessUtilization` SM samples and are proportional to the total GPU power/energy across all NVIDIA devices.
+
+- **Self-overhead (`-f o`):**
+  Three columns are appended after everything else, and a one-line summary is printed to stderr at exit:
+    ```text
+    ... OBS-CPU(ms/s) OBS-WAKE(/s) OBS-RAPLRD(/s)
+    ```
+  - `OBS-CPU(ms/s)`: CPU time used by power_eye itself (all threads) per second.
+  - `OBS-WAKE(/s)`: how often power_eye was put on a CPU per second (from `schedstat`).
+  - `OBS-RAPLRD(/s)`: RAPL `energy_uj` reads per second. Each read runs an MSR read on a CPU of that domain's package and, unless power_eye happens to run there, wakes that CPU by IPI, so this is an upper bound on the wakeups caused on other CPUs (DRAM domains with `-d` add reads).
+
+  `OBS-CPU` and `OBS-WAKE` need `CONFIG_SCHED_INFO`; without it they show `-`. This reports what power_eye itself did; it does not measure the system-wide effect (extra idle exits, reduced package C-state residency).
 
 ## Examples
 
