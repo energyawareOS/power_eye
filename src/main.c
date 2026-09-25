@@ -15,6 +15,7 @@ extern void init_nvml(void);
 extern void fini_nvml(void);
 extern void init_ipmi(void);
 extern void fini_ipmi(void);
+extern void fini_self_overhead(void);
 
 extern void monitor_energy(void);
 
@@ -41,6 +42,7 @@ usage(void)
         "     c: CPU power\n"
         "     E: Show energy field in outputs\n"
         "     H: Show field headers in outputs\n"
+        "     o: Self-overhead of the observation (CPU ms/s, wakeups/s, RAPL reads/s)\n"
 #ifndef NO_NVML
         "     g: GPU total power\n"
         "     G: Per-GPU power (implies g)\n"
@@ -71,6 +73,9 @@ parse_field_options(const char *optarg)
             break;
         case 'H':
             has_headers = 1;
+            break;
+        case 'o':
+            has_self = 1;
             break;
         default:
             fprintf(stderr, "Unknown field option: %c\n", *p);
@@ -139,6 +144,7 @@ main(const int argc, char *argv[])
 
     monitor_energy();
 
+    fini_self_overhead();
     fini_ipmi();
     fini_gpu_usage();
     fini_nvml();

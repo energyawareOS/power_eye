@@ -185,6 +185,13 @@ delta_energy(struct rapl_dom *doms, int n)
     return total;
 }
 
+/* RAPL energy_uj reads per tick; each is an MSR read on the domain's package. */
+int
+powercap_reads_per_tick(void)
+{
+    return n_cpu + n_dram;
+}
+
 void
 start_powercap_monitor()
 {

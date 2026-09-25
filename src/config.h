@@ -8,5 +8,6 @@ extern int has_dram;
 extern int has_mmdd;
 extern int has_energy;
 extern int has_headers;
+extern int has_self;
 
 #endif // _CONFIG_H_

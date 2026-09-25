@@ -9,6 +9,7 @@ int has_dram = 0;
 int has_mmdd = 0;
 int has_energy = 0;
 int has_headers = 0;
+int has_self = 0;
 
 extern void print_gpu_headers(void);
 extern void monitor_gpu_energy(void);
@@ -26,6 +27,8 @@ extern void monitor_ipmi(void);
 extern void start_gpu_monitor(void);
 
 extern void report_by_timestep(void);
+extern void start_self_overhead(void);
+extern void monitor_self_overhead(void);
 
 void
 monitor_energy(void)
@@ -37,6 +40,7 @@ monitor_energy(void)
     timestamp_start();
 
     start_powercap_monitor();
+    start_self_overhead();
 
 #ifndef NO_NVML
     start_gpu_monitor();
@@ -51,6 +55,7 @@ monitor_energy(void)
         monitor_gpu_usages();
         monitor_ipmi();
         monitor_gpu_energy();
+        monitor_self_overhead();
 
         report_by_timestep();
     }
