@@ -16,6 +16,8 @@ extern void fini_nvml(void);
 extern void init_ipmi(void);
 extern void fini_ipmi(void);
 extern void fini_self_overhead(void);
+extern void init_adaptive(void);
+extern void fini_adaptive(void);
 
 extern void monitor_energy(void);
 
@@ -33,6 +35,9 @@ usage(void)
         "Options:\n"
         "  -i <interval>  Sampling interval in seconds, fractions allowed (default: 1)\n"
         "  -t <timeout>   Total measurement duration in seconds (default: 120 seconds)\n"
+        "  -A <max>       Adaptive interval: while power is steady, double the interval up to\n"
+        "                 <max> seconds; return to -i when it changes\n"
+        "  -T <watts>     Change tolerance for -A (default: 1.0, or 3%% of the mean if larger)\n"
         "  -d             Enable DRAM power measurement\n"
         "  -h             Show this help message and exit\n"
         "  -I             Enable IPMI power measurement\n"
@@ -89,7 +94,7 @@ parse_args(int argc, char *argv[])
 {
     int c;
 
-    while ((c = getopt(argc, argv, "i:t:f:dhIp:")) != -1) {
+    while ((c = getopt(argc, argv, "i:t:f:dhIp:A:T:")) != -1) {
         switch (c) {
         case 'i':
             {
@@ -114,6 +119,27 @@ parse_args(int argc, char *argv[])
             break;
         case 'f':
             parse_field_options(optarg);
+            break;
+        case 'A':
+            {
+                char *end;
+                double sec = strtod(optarg, &end);
+                if (*end != '\0' || sec < 0.001) {
+                    fprintf(stderr, "Invalid -A value: %s\n", optarg);
+                    exit(EXIT_FAILURE);
+                }
+                adapt_cap_us = (unsigned long)(sec * 1000000.0 + 0.5);
+            }
+            break;
+        case 'T':
+            {
+                char *end;
+                adapt_tol_abs_w = strtod(optarg, &end);
+                if (*end != '\0' || adapt_tol_abs_w <= 0) {
+                    fprintf(stderr, "Invalid -T value: %s\n", optarg);
+                    exit(EXIT_FAILURE);
+                }
+            }
             break;
         case 'h':
             usage();
@@ -141,9 +167,11 @@ main(const int argc, char *argv[])
     init_nvml();
     init_gpu_usage();
     init_ipmi();
+    init_adaptive();
 
     monitor_energy();
 
+    fini_adaptive();
     fini_self_overhead();
     fini_ipmi();
     fini_gpu_usage();

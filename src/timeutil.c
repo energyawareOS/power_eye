@@ -69,6 +69,16 @@ get_usec_elapsed(struct timespec *start, struct timespec *end)
     return (uint64_t)sec * 1000000 + (uint64_t)(nsec / 1000);
 }
 
+/* Time left until the end of the run, measured from the last scheduled tick. */
+uint64_t
+timestamp_remaining_us(void)
+{
+    uint64_t elapsed = get_usec_elapsed(&ts_start, &ts_next);
+    uint64_t total = (uint64_t)timeout * 1000000;
+
+    return elapsed >= total ? 0 : total - elapsed;
+}
+
 void
 timestamp_start(void)
 {

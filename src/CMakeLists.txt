@@ -11,6 +11,8 @@ set(SRC_FILES
         proc_usage.h
         gpu_usage.c
         self_overhead.c
+        adaptive.c
+        adaptive_core.c
 )
 
 add_executable(power_eye ${SRC_FILES})

@@ -16,6 +16,7 @@ struct rapl_dom {
     int fd;
     double max_range;   /* max_energy_range_uj in J, 0 if unknown */
     double last;        /* last raw reading in J */
+    double max_power;   /* highest constraint max_power in W, 0 if unknown */
 };
 
 static struct rapl_dom cpu_doms[MAX_PKGS], dram_doms[MAX_PKGS];
@@ -68,6 +69,13 @@ add_dom(struct rapl_dom *doms, int *n, const char *dir)
     doms[*n].fd = open_or_die(path);
     snprintf(path, sizeof path, "%s/max_energy_range_uj", dir);
     doms[*n].max_range = read_uj_file(path);
+    doms[*n].max_power = 0;
+    for (int c = 0; c < 2; c++) {
+        snprintf(path, sizeof path, "%s/constraint_%d_max_power_uw", dir, c);
+        double w = read_uj_file(path);   /* uW -> W by the same /1e6 */
+        if (w > doms[*n].max_power)
+            doms[*n].max_power = w;
+    }
     (*n)++;
 }
 
@@ -183,6 +191,36 @@ delta_energy(struct rapl_dom *doms, int n)
         total += d;
     }
     return total;
+}
+
+/*
+ * Longest safe time (s) between two reads of every domain: the counter range
+ * divided by the highest power it can reach, halved for margin. Domains that
+ * do not report a maximum power are assumed to reach ASSUMED_*_MAX_W.
+ * Returns 0 if no range is known.
+ */
+#define ASSUMED_PKG_MAX_W 300.0
+#define ASSUMED_DRAM_MAX_W 100.0
+
+static double
+dom_bound(const struct rapl_dom *d, double assumed_w)
+{
+    double w = d->max_power > 0 ? d->max_power : assumed_w;
+    return d->max_range > 0 ? d->max_range / w / 2.0 : 0;
+}
+
+double
+powercap_wrap_bound_s(void)
+{
+    double best = 0;
+
+    for (int i = 0; i < n_cpu + n_dram; i++) {
+        double b = i < n_cpu ? dom_bound(&cpu_doms[i], ASSUMED_PKG_MAX_W)
+                             : dom_bound(&dram_doms[i - n_cpu], ASSUMED_DRAM_MAX_W);
+        if (b > 0 && (best == 0 || b < best))
+            best = b;
+    }
+    return best;
 }
 
 /* RAPL energy_uj reads per tick; each is an MSR read on the domain's package. */

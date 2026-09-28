@@ -10,3 +10,8 @@ include_directories(include)
 option(USE_NVML "Build with NVIDIA NVML support" OFF)
 
 add_subdirectory(src)
+
+enable_testing()
+add_executable(test_adaptive_core tests/test_adaptive_core.c src/adaptive_core.c)
+target_link_libraries(test_adaptive_core PRIVATE m)
+add_test(NAME adaptive_core COMMAND test_adaptive_core)
