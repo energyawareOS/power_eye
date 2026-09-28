@@ -52,12 +52,14 @@ cmake --build build
 ## Usage
 
 ```bash
-./power_eye [-i <interval>] [-t <timeout>] [-d] [-I] [-p <pid>]... [-f <specs>] [-h]
+./power_eye [-i <interval>] [-t <timeout>] [-d] [-I] [-p <pid>]... [-A <max>] [-T <watts>] [-f <specs>] [-h]
 ```
 
 Options:
 - `-i <interval>`: Sampling interval in seconds; fractional values such as `0.5` are accepted, invalid or sub-millisecond values are rejected (default: 1)
 - `-t <timeout>`: Total measurement duration in seconds (default: 120)
+- `-A <max>`: Adaptive sampling interval. `-i` is the base interval. While the measured power stays within a tolerance band of the running mean, the next interval doubles up to `<max>` seconds; as soon as a sample leaves the band it returns to `-i` and the band restarts at the new level. The cap is lowered to the RAPL counter wrap bound (`max_energy_range_uj / max power / 2`, from powercap; domains that do not report a maximum power are assumed to reach 300 W for packages and 100 W for DRAM, so `-d` can lower the cap) so no energy is lost between reads. An `INT(s)` column at the end of every row gives the length of that row's interval. Rows still report power/energy averaged over their own interval.
+- `-T <watts>`: Tolerance band for `-A`: a change is a sample more than `max(<watts>, 3% of the mean)` away from the mean of the current quiet period (default 1.0 W).
 - `-d`: Enable DRAM power/energy, summed over all sockets (if no DRAM RAPL domain exists, a warning is printed and DRAM is disabled)
 - `-I`: Enable IPMI power measurement
 - `-p <pid>`: Monitor a specific process by PID. May be given multiple times.
@@ -128,7 +130,7 @@ Options:
   Per-pid GPU values are derived from `nvmlDeviceGetProcessUtilization` SM samples and are proportional to the total GPU power/energy across all NVIDIA devices.
 
 - **Self-overhead (`-f o`):**
-  Three columns are appended after everything else, and a one-line summary is printed to stderr at exit:
+  Three columns are appended after the per-process columns, and a one-line summary is printed to stderr at exit:
     ```text
     ... OBS-CPU(ms/s) OBS-WAKE(/s) OBS-RAPLRD(/s)
     ```
@@ -137,6 +139,9 @@ Options:
   - `OBS-RAPLRD(/s)`: RAPL `energy_uj` reads per second. Each read runs an MSR read on a CPU of that domain's package and, unless power_eye happens to run there, wakes that CPU by IPI, so this is an upper bound on the wakeups caused on other CPUs (DRAM domains with `-d` add reads).
 
   `OBS-CPU` and `OBS-WAKE` need `CONFIG_SCHED_INFO`; without it they show `-`. This reports what power_eye itself did; it does not measure the system-wide effect (extra idle exits, reduced package C-state residency).
+
+- **Adaptive interval (`-A`):**
+  One column, `INT(s)`, is appended after all other columns (after the self-overhead columns, if any). Averaging over a long interval hides short bursts: a burst raises the average only by `burst energy / interval`, so with a long cap only sustained changes are noticed. The interval is changed at the end of a tick; timestamps and `(J)` columns use the interval of that row. Per-GPU process utilization (`-f g`) still assumes the interval it was started with and is not adjusted.
 
 ## Examples
 
