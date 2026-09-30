@@ -14,15 +14,16 @@
  * Cost of the observation itself ("-f o"), per tick and for the whole run:
  *   OBS-CPU(ms/s)    CPU time this process (all threads) used per second
  *   OBS-WAKE(/s)     times it was put on a CPU per second (from schedstat)
- *   OBS-RAPLRD(/s)   RAPL energy_uj reads per second. Each read executes an
- *                    MSR read on a CPU of the domain's package and, unless we
- *                    happen to run there, wakes that CPU by IPI. An upper
- *                    bound on the wakeups caused on other CPUs.
+ *   OBS-RAPLRD(/s)   Reads per second that may wake another CPU. With sysfs
+ *                    each energy_uj read executes an MSR read on a CPU of the
+ *                    domain's package and, unless we happen to run there,
+ *                    wakes that CPU by IPI (an upper bound). With the BPF
+ *                    sampler (-B) it counts the samples this process forced.
  * Needs CONFIG_SCHED_INFO (/proc/<pid>/task/<tid>/schedstat); the first two
  * columns show "-" without it.
  */
 
-extern int powercap_reads_per_tick(void);
+extern unsigned long powercap_remote_reads_total(void);
 
 static int have_schedstat;
 static uint64_t prev_run_ns, prev_slices;
@@ -30,6 +31,7 @@ static uint64_t first_run_ns, first_slices;
 static struct timespec t_prev, t_first;
 static unsigned long n_ticks;
 static double cpu_ms_s, wake_s, rd_s;
+static unsigned long prev_reads, first_reads;
 
 /* Sum over all threads; returns -1 if schedstat is unavailable. */
 static int
@@ -89,6 +91,7 @@ start_self_overhead(void)
     have_schedstat = read_self_sched(&prev_run_ns, &prev_slices) == 0;
     if (!have_schedstat)
         fprintf(stderr, "warning: no schedstat (CONFIG_SCHED_INFO); OBS-CPU and OBS-WAKE unavailable\n");
+    prev_reads = first_reads = powercap_remote_reads_total();
     first_run_ns = prev_run_ns;
     first_slices = prev_slices;
     clock_gettime(CLOCK_MONOTONIC, &t_prev);
@@ -109,7 +112,11 @@ monitor_self_overhead(void)
     if (dt <= 0)
         return;
     n_ticks++;
-    rd_s = powercap_reads_per_tick() / dt;
+    {
+        unsigned long r = powercap_remote_reads_total();
+        rd_s = (r - prev_reads) / dt;
+        prev_reads = r;
+    }
     if (have_schedstat && read_self_sched(&run, &sl) == 0) {
         cpu_ms_s = (run >= prev_run_ns ? run - prev_run_ns : 0) / 1e6 / dt;
         wake_s = (sl >= prev_slices ? sl - prev_slices : 0) / dt;
@@ -146,6 +153,7 @@ fini_self_overhead(void)
                 (run - first_run_ns) / 1e6 / total, (run - first_run_ns) / 1e9 / total * 100.0,
                 (sl - first_slices) / total);
     }
-    fprintf(stderr, " up to %.2f remote RAPL reads/s (each may wake a package's CPU)\n",
-            (double)powercap_reads_per_tick() * n_ticks / total);
+    fprintf(stderr, " %.2f reads/s that may wake a package's CPU (%lu in total)\n",
+            (powercap_remote_reads_total() - first_reads) / total,
+            powercap_remote_reads_total() - first_reads);
 }

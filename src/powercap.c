@@ -7,7 +7,9 @@
 #include <unistd.h>
 
 #include <errno.h>
+#include <stdint.h>
 
+#include "bpf_sampler.h"
 #include "config.h"
 
 #define MAX_PKGS 64
@@ -23,6 +25,10 @@ static struct rapl_dom cpu_doms[MAX_PKGS], dram_doms[MAX_PKGS];
 static int n_cpu, n_dram;
 
 extern int has_dram;
+
+int use_bpf;                    /* -B: take samples from the BPF sampler instead of sysfs */
+static unsigned long sysfs_reads;
+static struct bpf_sample bprev[MAX_PKGS];
 
 double energy_cpu, power_cpu, energy_dram, power_dram;
 
@@ -182,6 +188,7 @@ delta_energy(struct rapl_dom *doms, int n)
 
     for (int i = 0; i < n; i++) {
         double cur = read_energy(doms[i].fd);
+        sysfs_reads++;
         double d = cur - doms[i].last;
         if (d < 0 && doms[i].max_range > 0)
             d += doms[i].max_range;
@@ -223,16 +230,89 @@ powercap_wrap_bound_s(void)
     return best;
 }
 
-/* RAPL energy_uj reads per tick; each is an MSR read on the domain's package. */
-int
-powercap_reads_per_tick(void)
+/*
+ * Reads that may wake another CPU, cumulative: sysfs energy_uj reads (each is
+ * an MSR read on a CPU of the domain's package) or, with the BPF sampler,
+ * samples forced by this process.
+ */
+unsigned long
+powercap_remote_reads_total(void)
 {
-    return n_cpu + n_dram;
+    return use_bpf ? bpf_sampler_forced_total() : sysfs_reads;
+}
+
+/* Switch to the BPF sampler; on failure keep reading sysfs. */
+void
+init_powercap_bpf(void)
+{
+    if (!use_bpf)
+        return;
+    if (bpf_sampler_init(has_dram) != 0) {
+        fprintf(stderr, "falling back to reading RAPL through sysfs\n");
+        use_bpf = 0;
+        return;
+    }
+    if (bpf_sampler_npkg() != n_cpu)
+        fprintf(stderr, "warning: %d package(s) in the BPF sampler but %d RAPL package domain(s) in sysfs\n",
+                bpf_sampler_npkg(), n_cpu);
+}
+
+void
+fini_powercap_bpf(void)
+{
+    if (use_bpf)
+        bpf_sampler_fini();
+}
+
+/*
+ * One tick from the BPF samples. Per package, power is the energy between the
+ * previous and the latest sample divided by the time between them (sample
+ * times, not tick times), so rows stay exact however old the samples are.
+ */
+static void
+bpf_tick(int baseline)
+{
+    uint64_t min_ns = (uint64_t)interval * 1000 / 10;   /* a tenth of the tick */
+    double e_cpu = 0, e_dram = 0, p_cpu = 0, p_dram = 0;
+
+    if (min_ns < 10000000ULL) min_ns = 10000000ULL;     /* 10 ms .. 10 s */
+    if (min_ns > 10000000000ULL) min_ns = 10000000000ULL;
+    bpf_sampler_set_min_interval_ns(min_ns);
+
+    for (int i = 0; i < bpf_sampler_npkg() && i < MAX_PKGS; i++) {
+        struct bpf_sample s;
+
+        /* a sample older than half a tick is refreshed by a forced one */
+        if (bpf_sampler_get(i, baseline ? 0 : interval / 2, &s) != 0)
+            exit(EXIT_FAILURE);
+        if (!baseline && s.ts_ns > bprev[i].ts_ns) {
+            double dt = (s.ts_ns - bprev[i].ts_ns) / 1e9;
+            double de = s.energy_pkg_j - bprev[i].energy_pkg_j;
+            double dr = s.energy_ram_j - bprev[i].energy_ram_j;
+            e_cpu += de;
+            p_cpu += de / dt;
+            e_dram += dr;
+            p_dram += dr / dt;
+        }
+        bprev[i] = s;
+    }
+    if (baseline)
+        return;
+    energy_cpu = e_cpu;
+    power_cpu = p_cpu;
+    if (n_dram > 0) {
+        energy_dram = e_dram;
+        power_dram = p_dram;
+    }
 }
 
 void
 start_powercap_monitor()
 {
+    if (use_bpf) {
+        bpf_tick(1);
+        return;
+    }
     delta_energy(cpu_doms, n_cpu);   /* sets baseline; first call's delta is discarded */
     delta_energy(dram_doms, n_dram);
 }
@@ -242,6 +322,10 @@ monitor_powercap_energy(void)
 {
     double sec = interval / 1e6;
 
+    if (use_bpf) {
+        bpf_tick(0);
+        return;
+    }
     energy_cpu = delta_energy(cpu_doms, n_cpu);
     power_cpu = energy_cpu / sec;
     if (n_dram > 0) {

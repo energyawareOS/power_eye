@@ -9,6 +9,7 @@ extern int has_mmdd;
 extern int has_energy;
 extern int has_headers;
 extern int has_self;
+extern int use_bpf;
 extern unsigned long adapt_cap_us;
 extern double adapt_tol_abs_w;
 

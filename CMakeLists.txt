@@ -8,6 +8,7 @@ include_directories(include)
 
 # Must be declared before add_subdirectory() so src/ sees it.
 option(USE_NVML "Build with NVIDIA NVML support" OFF)
+option(USE_BPF "Build with the eBPF idle-exit sampler (-B); needs libbpf and clang" OFF)
 
 add_subdirectory(src)
 

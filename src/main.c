@@ -16,6 +16,8 @@ extern void fini_nvml(void);
 extern void init_ipmi(void);
 extern void fini_ipmi(void);
 extern void fini_self_overhead(void);
+extern void init_powercap_bpf(void);
+extern void fini_powercap_bpf(void);
 extern void init_adaptive(void);
 extern void fini_adaptive(void);
 
@@ -39,6 +41,8 @@ usage(void)
         "                 <max> seconds; return to -i when it changes\n"
         "  -T <watts>     Change tolerance for -A (default: 1.0, or 3%% of the mean if larger)\n"
         "  -d             Enable DRAM power measurement\n"
+        "  -B             Read RAPL from an eBPF sampler on CPU idle exits instead of sysfs\n"
+        "                 (no IPIs; needs a build with -DUSE_BPF=ON, root)\n"
         "  -h             Show this help message and exit\n"
         "  -I             Enable IPMI power measurement\n"
         "  -p <pid>       Monitor a specific process by PID\n"
@@ -94,7 +98,7 @@ parse_args(int argc, char *argv[])
 {
     int c;
 
-    while ((c = getopt(argc, argv, "i:t:f:dhIp:A:T:")) != -1) {
+    while ((c = getopt(argc, argv, "i:t:f:dhIBp:A:T:")) != -1) {
         switch (c) {
         case 'i':
             {
@@ -147,6 +151,9 @@ parse_args(int argc, char *argv[])
         case 'I':
             use_ipmi = 1;
             break;
+        case 'B':
+            use_bpf = 1;
+            break;
         case 'p':
             add_proc_usage((pid_t)strtoul(optarg, NULL, 10));
             break;
@@ -164,6 +171,7 @@ main(const int argc, char *argv[])
 
     init_cpu_usage();
     init_powercap();
+    init_powercap_bpf();
     init_nvml();
     init_gpu_usage();
     init_ipmi();
@@ -176,6 +184,7 @@ main(const int argc, char *argv[])
     fini_ipmi();
     fini_gpu_usage();
     fini_nvml();
+    fini_powercap_bpf();
     fini_powercap();
     fini_cpu_usage();
 
