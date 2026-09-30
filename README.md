@@ -16,6 +16,7 @@ It is implemented in C and built with CMake.
 - **OS:** Linux with `/sys/class/powercap` (RAPL) support. Reading `energy_uj` may require root or a udev rule.
 - **CPU:** Intel processor with RAPL package—and optionally DRAM—domains
 - **GPU (optional):** NVIDIA driver + NVML (`libnvidia-ml.so`) if using `-f g`/`-f G`
+- **eBPF sampler (optional):** `libbpf-dev` and `clang` at build time, root and a kernel with RAPL perf events (`/sys/bus/event_source/devices/power`) at run time, if using `-B`
 - **IPMI (optional):** a BMC exposed through the kernel IPMI driver (`/dev/ipmi0`, `/dev/ipmi/0` or `/dev/ipmidev/0`) if using `-I`; `ipmitool` is not required
 
 ## Build Instructions
@@ -47,12 +48,21 @@ cmake -B build -DUSE_NVML=ON -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ```
 
+- eBPF sampler build (adds `-B`)
+
+```bash
+cmake -B build -DUSE_BPF=ON -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+```
+
+`USE_BPF=ON` needs `libbpf` (found with pkg-config) and `clang`; the BPF object is compiled during the build and embedded in the executable. Without it, `-B` prints a message and sysfs is used.
+
 `USE_NVML=ON` requires the CUDA toolkit's `nvml` headers/library. Adjust include/lib paths for your distribution if CMake cannot find them (e.g., `/usr/local/cuda/include`, `/usr/local/cuda/lib64`).
 
 ## Usage
 
 ```bash
-./power_eye [-i <interval>] [-t <timeout>] [-d] [-I] [-p <pid>]... [-A <max>] [-T <watts>] [-f <specs>] [-h]
+./power_eye [-i <interval>] [-t <timeout>] [-d] [-I] [-B] [-p <pid>]... [-A <max>] [-T <watts>] [-f <specs>] [-h]
 ```
 
 Options:
@@ -61,6 +71,7 @@ Options:
 - `-A <max>`: Adaptive sampling interval. `-i` is the base interval. While the measured power stays within a tolerance band of the running mean, the next interval doubles up to `<max>` seconds; as soon as a sample leaves the band it returns to `-i` and the band restarts at the new level. The cap is lowered to the RAPL counter wrap bound (`max_energy_range_uj / max power / 2`, from powercap; domains that do not report a maximum power are assumed to reach 300 W for packages and 100 W for DRAM, so `-d` can lower the cap) so no energy is lost between reads. An `INT(s)` column at the end of every row gives the length of that row's interval. Rows still report power/energy averaged over their own interval.
 - `-T <watts>`: Tolerance band for `-A`: a change is a sample more than `max(<watts>, 3% of the mean)` away from the mean of the current quiet period (default 1.0 W).
 - `-d`: Enable DRAM power/energy, summed over all sockets (if no DRAM RAPL domain exists, a warning is printed and DRAM is disabled)
+- `-B`: Read the RAPL energy counters from an eBPF sampler instead of sysfs (needs a `USE_BPF=ON` build and root; falls back to sysfs with a message if it cannot start). A BPF program on the `cpu_idle` tracepoint reads the package (and with `-d` DRAM) energy perf events on the idle exit of whichever CPU of a package wakes first, at most once per a tenth of the interval (10 ms .. 10 s), so reading does not wake any CPU by IPI. power_eye only reads the latest sample at each tick; if it is older than half an interval it takes one itself, on a CPU of that package (this is what `OBS-RAPLRD` counts with `-B`). Power is energy divided by the time between the samples used, so a row's `(J)` covers about one interval (not exactly), and the first row uses a sample taken at start.
 - `-I`: Enable IPMI power measurement
 - `-p <pid>`: Monitor a specific process by PID. May be given multiple times.
 - `-f <specs>`: Field/output specs. `<specs>` is a string of letters (e.g. `-f cEH`):
@@ -136,7 +147,7 @@ Options:
     ```
   - `OBS-CPU(ms/s)`: CPU time used by power_eye itself (all threads) per second.
   - `OBS-WAKE(/s)`: how often power_eye was put on a CPU per second (from `schedstat`).
-  - `OBS-RAPLRD(/s)`: RAPL `energy_uj` reads per second. Each read runs an MSR read on a CPU of that domain's package and, unless power_eye happens to run there, wakes that CPU by IPI, so this is an upper bound on the wakeups caused on other CPUs (DRAM domains with `-d` add reads).
+  - `OBS-RAPLRD(/s)`: RAPL `energy_uj` reads per second. Each read runs an MSR read on a CPU of that domain's package and, unless power_eye happens to run there, wakes that CPU by IPI, so this is an upper bound on the wakeups caused on other CPUs (DRAM domains with `-d` add reads). With `-B` it counts the samples power_eye forced itself, normally 0 on a busy system.
 
   `OBS-CPU` and `OBS-WAKE` need `CONFIG_SCHED_INFO`; without it they show `-`. This reports what power_eye itself did; it does not measure the system-wide effect (extra idle exits, reduced package C-state residency).
 
