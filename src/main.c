@@ -19,6 +19,8 @@ extern void fini_self_overhead(void);
 extern void init_powercap_bpf(void);
 extern void fini_powercap_bpf(void);
 extern void init_adaptive(void);
+extern void init_coma(void);
+extern void fini_coma(void);
 extern void fini_adaptive(void);
 
 extern void monitor_energy(void);
@@ -40,6 +42,12 @@ usage(void)
         "  -A <max>       Adaptive interval: while power is steady, double the interval up to\n"
         "                 <max> seconds; return to -i when it changes\n"
         "  -T <watts>     Change tolerance for -A (default: 1.0, or 3%% of the mean if larger)\n"
+        "  -C <hours>     Long-idle (coma) detection: report a coma candidate after <hours> of\n"
+        "                 consecutive idle windows (needs -B for C-state residency; use with -A)\n"
+        "  -W <sec>       Coma detection window length (default: 600)\n"
+        "  -D <watts>     Window is idle if package power <= floor + <watts> (default: 1.0)\n"
+        "  -R <percent>   ... and deep package C-state residency >= <percent> (default: 80)\n"
+        "  -F <watts>     Idle power floor; default: learned as the lowest window power\n"
         "  -d             Enable DRAM power measurement\n"
         "  -B             Read RAPL from an eBPF sampler on CPU idle exits instead of sysfs\n"
         "                 (no IPIs; needs a build with -DUSE_BPF=ON, root)\n"
@@ -98,7 +106,7 @@ parse_args(int argc, char *argv[])
 {
     int c;
 
-    while ((c = getopt(argc, argv, "i:t:f:dhIBp:A:T:")) != -1) {
+    while ((c = getopt(argc, argv, "i:t:f:dhIBp:A:T:C:W:D:R:F:")) != -1) {
         switch (c) {
         case 'i':
             {
@@ -133,6 +141,25 @@ parse_args(int argc, char *argv[])
                     exit(EXIT_FAILURE);
                 }
                 adapt_cap_us = (unsigned long)(sec * 1000000.0 + 0.5);
+            }
+            break;
+        case 'C':
+        case 'W':
+        case 'D':
+        case 'R':
+        case 'F':
+            {
+                char *end;
+                double v = strtod(optarg, &end);
+                if (*end != '\0' || v <= 0 || (c == 'R' && v > 100)) {
+                    fprintf(stderr, "Invalid -%c value: %s\n", c, optarg);
+                    exit(EXIT_FAILURE);
+                }
+                if (c == 'C') coma_hours = v;
+                else if (c == 'W') coma_window_s = v;
+                else if (c == 'D') coma_delta_w = v;
+                else if (c == 'R') coma_deep_pct = v;
+                else coma_floor_w = v;
             }
             break;
         case 'T':
@@ -176,9 +203,11 @@ main(const int argc, char *argv[])
     init_gpu_usage();
     init_ipmi();
     init_adaptive();
+    init_coma();
 
     monitor_energy();
 
+    fini_coma();
     fini_adaptive();
     fini_self_overhead();
     fini_ipmi();

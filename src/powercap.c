@@ -32,6 +32,12 @@ static struct bpf_sample bprev[MAX_PKGS];
 
 double energy_cpu, power_cpu, energy_dram, power_dram;
 
+/* The last tick as the coma detector needs it: its real length and the time
+ * spent in deep package C-states, averaged over packages (valid with -B and a
+ * cstate_pkg PMU only). */
+double tick_secs, tick_deep_s;
+int tick_deep_valid;
+
 static int
 open_quiet(const char *path)
 {
@@ -247,7 +253,7 @@ init_powercap_bpf(void)
 {
     if (!use_bpf)
         return;
-    if (bpf_sampler_init(has_dram) != 0) {
+    if (bpf_sampler_init(has_dram, coma_hours > 0) != 0) {
         fprintf(stderr, "falling back to reading RAPL through sysfs\n");
         use_bpf = 0;
         return;
@@ -273,7 +279,8 @@ static void
 bpf_tick(int baseline)
 {
     uint64_t min_ns = (uint64_t)interval * 1000 / 10;   /* a tenth of the tick */
-    double e_cpu = 0, e_dram = 0, p_cpu = 0, p_dram = 0;
+    double e_cpu = 0, e_dram = 0, p_cpu = 0, p_dram = 0, dt_sum = 0, deep_sum = 0;
+    int n_used = 0;
 
     if (min_ns < 10000000ULL) min_ns = 10000000ULL;     /* 10 ms .. 10 s */
     if (min_ns > 10000000000ULL) min_ns = 10000000000ULL;
@@ -293,6 +300,9 @@ bpf_tick(int baseline)
             p_cpu += de / dt;
             e_dram += dr;
             p_dram += dr / dt;
+            dt_sum += dt;
+            deep_sum += s.c6_s - bprev[i].c6_s;
+            n_used++;
         }
         bprev[i] = s;
     }
@@ -303,6 +313,11 @@ bpf_tick(int baseline)
     if (n_dram > 0) {
         energy_dram = e_dram;
         power_dram = p_dram;
+    }
+    if (n_used > 0) {
+        tick_secs = dt_sum / n_used;
+        tick_deep_s = deep_sum / n_used;
+        tick_deep_valid = bpf_sampler_has_c6();
     }
 }
 
@@ -328,6 +343,8 @@ monitor_powercap_energy(void)
     }
     energy_cpu = delta_energy(cpu_doms, n_cpu);
     power_cpu = energy_cpu / sec;
+    tick_secs = sec;
+    tick_deep_valid = 0;
     if (n_dram > 0) {
         energy_dram = delta_energy(dram_doms, n_dram);
         power_dram = energy_dram / sec;

@@ -21,6 +21,9 @@ static unsigned long n_changes;
 extern double powercap_wrap_bound_s(void);
 extern uint64_t timestamp_remaining_us(void);
 extern double power_cpu, power_dram;
+extern double tick_secs, tick_deep_s;
+extern int tick_deep_valid;
+extern uint64_t coma_window_remaining_us(void);
 
 void
 init_adaptive(void)
@@ -33,6 +36,7 @@ init_adaptive(void)
     st.cap_us = adapt_cap_us;
     st.tol_abs_w = adapt_tol_abs_w;
     st.tol_rel = 0.03;
+    st.tol_deep_pct = 10.0;
 
     wb = powercap_wrap_bound_s();
     if (wb > 0 && wb * 1e6 < (double)st.cap_us) {
@@ -41,8 +45,9 @@ init_adaptive(void)
     }
     if (st.cap_us < st.base_us)
         st.cap_us = st.base_us;
-    fprintf(stderr, "adaptive sampling: %.3g s .. %.0f s, change tolerance max(%.2f W, %.0f%%)\n",
-            st.base_us / 1e6, st.cap_us / 1e6, st.tol_abs_w, st.tol_rel * 100);
+    fprintf(stderr, "adaptive sampling: %.3g s .. %.0f s, change tolerance max(%.2f W, %.0f%%), "
+            "deep residency %.0f points\n",
+            st.base_us / 1e6, st.cap_us / 1e6, st.tol_abs_w, st.tol_rel * 100, st.tol_deep_pct);
 }
 
 void
@@ -63,13 +68,20 @@ report_adaptive(void)
 void
 update_adaptive(void)
 {
-    double w;
+    double w, deep;
+    unsigned long remaining, cw;
     int changed;
 
     if (adapt_cap_us == 0)
         return;
     w = power_cpu + (has_dram ? power_dram : 0);
-    interval = adaptive_step(&st, w, interval, interval, (unsigned long)timestamp_remaining_us(), &changed);
+    /* end the tick at the end of the run, or of the coma detector's window, whichever is first */
+    remaining = (unsigned long)timestamp_remaining_us();
+    cw = (unsigned long)coma_window_remaining_us();
+    if (cw > 0 && (remaining == 0 || cw < remaining))
+        remaining = cw;
+    deep = tick_deep_valid && tick_secs > 0 ? 100.0 * tick_deep_s / tick_secs : -1;
+    interval = adaptive_step(&st, w, deep, interval, interval, remaining, &changed);
     n_changes += changed;
 }
 

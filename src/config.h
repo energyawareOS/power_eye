@@ -10,6 +10,8 @@ extern int has_energy;
 extern int has_headers;
 extern int has_self;
 extern int use_bpf;
+extern double coma_hours;
+extern double coma_window_s, coma_delta_w, coma_deep_pct, coma_floor_w;
 extern unsigned long adapt_cap_us;
 extern double adapt_tol_abs_w;
 

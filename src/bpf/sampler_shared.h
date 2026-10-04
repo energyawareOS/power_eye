@@ -14,6 +14,7 @@ struct pkg_state {
     __u64 ts_ns;          /* CLOCK_MONOTONIC when the sample was taken */
     __u64 energy;         /* perf counter value, power/energy-pkg */
     __u64 ram;            /* perf counter value, power/energy-ram (if use_ram) */
+    __u64 c6;             /* perf counter value, cstate_pkg/c6-residency (if use_c6), TSC ticks */
     __u64 last_claim_ns;  /* rate limiter */
     __u64 reads;          /* samples taken */
     __u64 errors;         /* failed bpf_perf_event_read_value() calls */
@@ -24,6 +25,8 @@ struct pkg_state {
 struct sampler_cfg {
     __u64 min_interval_ns;
     __u32 use_ram;
+    __u32 use_c6;
     __u32 loader_tgid;    /* only this process may force a sample */
+    __u32 pad;
 };
 #endif

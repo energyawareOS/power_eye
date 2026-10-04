@@ -7,11 +7,15 @@ struct bpf_sample {
     uint64_t ts_ns;         /* CLOCK_MONOTONIC time of the sample */
     double energy_pkg_j;    /* cumulative package energy since the event was opened */
     double energy_ram_j;    /* same for DRAM (0 if not requested) */
+    double c6_s;            /* cumulative time in package C6 (s), 0 if not requested */
 };
 
 /* 0 on success; on failure a message was printed and the caller should fall
  * back to reading sysfs. */
-int bpf_sampler_init(int want_ram);
+int bpf_sampler_init(int want_ram, int want_c6);
+/* 1 if package C6 residency is sampled (it is dropped with a message if the
+ * cstate_pkg PMU or its c6-residency event is missing). */
+int bpf_sampler_has_c6(void);
 void bpf_sampler_fini(void);
 int bpf_sampler_npkg(void);
 /* Rate limit of idle-exit samples. */

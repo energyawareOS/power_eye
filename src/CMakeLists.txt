@@ -13,6 +13,8 @@ set(SRC_FILES
         self_overhead.c
         adaptive.c
         adaptive_core.c
+        coma.c
+        coma_core.c
         bpf_sampler.c
         bpf_sampler.h
 )

@@ -29,6 +29,7 @@ extern void start_gpu_monitor(void);
 extern void report_by_timestep(void);
 extern void start_self_overhead(void);
 extern void update_adaptive(void);
+extern void update_coma(void);
 extern void monitor_self_overhead(void);
 
 void
@@ -59,6 +60,7 @@ monitor_energy(void)
         monitor_self_overhead();
 
         report_by_timestep();
+        update_coma();
         update_adaptive();
     }
 }

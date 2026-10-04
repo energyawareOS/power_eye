@@ -20,6 +20,13 @@ struct {
 } ev_ram SEC(".maps");
 
 struct {
+    __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
+    __uint(key_size, sizeof(__u32));
+    __uint(value_size, sizeof(__u32));
+    __uint(max_entries, MAXPKG);
+} ev_c6 SEC(".maps");
+
+struct {
     __uint(type, BPF_MAP_TYPE_ARRAY);
     __type(key, __u32);
     __type(value, struct sampler_cfg);
@@ -45,7 +52,7 @@ struct {
  * wins the claim, so there is a single writer at a time. */
 static __always_inline void take_sample(__u32 pkg, struct sampler_cfg *c, int force)
 {
-    struct bpf_perf_event_value ve = {}, vr = {};
+    struct bpf_perf_event_value ve = {}, vr = {}, vc = {};
     struct pkg_state *st;
     __u64 now, last;
     long ret;
@@ -65,6 +72,8 @@ static __always_inline void take_sample(__u32 pkg, struct sampler_cfg *c, int fo
     ret = bpf_perf_event_read_value(&ev_energy, pkg, &ve, sizeof(ve));
     if (!ret && c->use_ram)
         ret = bpf_perf_event_read_value(&ev_ram, pkg, &vr, sizeof(vr));
+    if (!ret && c->use_c6)
+        ret = bpf_perf_event_read_value(&ev_c6, pkg, &vc, sizeof(vc));
     if (ret) {
         st->errors++;
         st->last_err = ret;
@@ -74,6 +83,7 @@ static __always_inline void take_sample(__u32 pkg, struct sampler_cfg *c, int fo
     st->ts_ns = now;
     st->energy = ve.counter;
     st->ram = vr.counter;
+    st->c6 = vc.counter;
     st->reads++;
     if (force)
         st->forced++;
