@@ -62,7 +62,7 @@ cmake --build build
 ## Usage
 
 ```bash
-./power_eye [-i <interval>] [-t <timeout>] [-d] [-I] [-B] [-p <pid>]... [-A <max>] [-T <watts>] [-f <specs>] [-h]
+./power_eye [-i <interval>] [-t <timeout>] [-d] [-I] [-B] [-p <pid>]... [-A <max>] [-T <watts>] [-C <hours>] [-W <sec>] [-D <watts>] [-R <percent>] [-F <watts>] [-f <specs>] [-h]
 ```
 
 Options:
@@ -70,6 +70,11 @@ Options:
 - `-t <timeout>`: Total measurement duration in seconds (default: 120)
 - `-A <max>`: Adaptive sampling interval. `-i` is the base interval. While the measured power stays within a tolerance band of the running mean, the next interval doubles up to `<max>` seconds; as soon as a sample leaves the band it returns to `-i` and the band restarts at the new level. The cap is lowered to the RAPL counter wrap bound (`max_energy_range_uj / max power / 2`, from powercap; domains that do not report a maximum power are assumed to reach 300 W for packages and 100 W for DRAM, so `-d` can lower the cap) so no energy is lost between reads. An `INT(s)` column at the end of every row gives the length of that row's interval. Rows still report power/energy averaged over their own interval.
 - `-T <watts>`: Tolerance band for `-A`: a change is a sample more than `max(<watts>, 3% of the mean)` away from the mean of the current quiet period (default 1.0 W).
+- `-C <hours>`: Long-idle ("coma") detection; see below. Reports a coma candidate after `<hours>` (fractions allowed) of consecutive idle windows. Needs `-B` for package C-state residency; use it with `-A` so the node is sampled rarely while idle.
+- `-W <sec>`: Window length for `-C` (default 600).
+- `-D <watts>`: A window is idle if its mean package power is at most the idle floor plus this (default 1.0).
+- `-R <percent>`: ... and its deep package C-state (C6) residency, averaged over packages, is at least this (default 80).
+- `-F <watts>`: Idle power floor. By default it is learned as the lowest mean power of windows that meet the residency condition, so a busy start cannot define it; give it explicitly for a reliable verdict.
 - `-d`: Enable DRAM power/energy, summed over all sockets (if no DRAM RAPL domain exists, a warning is printed and DRAM is disabled)
 - `-B`: Read the RAPL energy counters from an eBPF sampler instead of sysfs (needs a `USE_BPF=ON` build and root; falls back to sysfs with a message if it cannot start). A BPF program on the `cpu_idle` tracepoint reads the package (and with `-d` DRAM) energy perf events on the idle exit of whichever CPU of a package wakes first, at most once per a tenth of the interval (10 ms .. 10 s), so reading does not wake any CPU by IPI. power_eye only reads the latest sample at each tick; if it is older than half an interval it takes one itself, on a CPU of that package (this is what `OBS-RAPLRD` counts with `-B`). Power is energy divided by the time between the samples used, so a row's `(J)` covers about one interval (not exactly), and the first row uses a sample taken at start.
 - `-I`: Enable IPMI power measurement
@@ -153,6 +158,18 @@ Options:
 
 - **Adaptive interval (`-A`):**
   One column, `INT(s)`, is appended after all other columns (after the self-overhead columns, if any). Averaging over a long interval hides short bursts: a burst raises the average only by `burst energy / interval`, so with a long cap only sustained changes are noticed. The interval is changed at the end of a tick; timestamps and `(J)` columns use the interval of that row. Per-GPU process utilization (`-f g`) still assumes the interval it was started with and is not adjusted.
+
+- **Coma detection (`-C`):**
+  Time is cut into windows (`-W`, default 10 minutes). A window is idle if its mean package power is within `-D` of the idle floor and its package C6 residency is at least `-R`. After `<hours>` of consecutive idle windows the node is a coma candidate; a busy window ends it. Output goes to stdout as `#` lines after the data row that closed the window, and a summary to stderr at exit:
+    ```text
+    # window 10-04 10:00:00 .. 10-04 10:10:00 25.412 W (floor 25.301 W, +0.111 W) deep 86.3% -> idle (idle for 1.00 h)
+    # COMA CANDIDATE: idle since 10-04 09:10:00 (1.00 h)
+    # coma candidacy ended: busy window ending 10-04 12:30:00
+    ```
+  With `-A`, the interval is cut so that ticks end on window boundaries, and besides power the deep residency now also resets the interval to `-i` when it moves by more than 10 percentage points. The verdict is made at a window end, so it comes at most one window after the idle time reaches `<hours>`. Without `-B` (or without a `cstate_pkg` PMU) there is no residency and the verdict uses power only, which is unreliable; a warning says so. A short burst inside a window is averaged away, as with `-A`. Example:
+    ```bash
+    sudo ./power_eye -B -d -i 1 -A 600 -C 6 -t 100000000 -f cEH
+    ```
 
 ## Examples
 
