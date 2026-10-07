@@ -78,6 +78,10 @@ update_adaptive(void)
     /* end the tick at the end of the run, or of the coma detector's window, whichever is first */
     remaining = (unsigned long)timestamp_remaining_us();
     cw = (unsigned long)coma_window_remaining_us();
+    /* A remainder shorter than the base interval would only add a tiny extra tick (and a
+     * forced sample); let the window overshoot by up to one base interval instead. */
+    if (cw > 0 && cw < st.base_us)
+        cw = st.base_us;
     if (cw > 0 && (remaining == 0 || cw < remaining))
         remaining = cw;
     deep = tick_deep_valid && tick_secs > 0 ? 100.0 * tick_deep_s / tick_secs : -1;

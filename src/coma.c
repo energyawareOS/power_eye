@@ -20,7 +20,7 @@ double coma_deep_pct = 80;
 double coma_floor_w;               /* 0 = learn */
 
 static struct coma_state st;
-static time_t t_start;
+static time_t t_start;      /* wall-clock time of the start of the first window */
 static int warned_no_deep;
 
 extern double energy_cpu, tick_secs, tick_deep_s;
@@ -54,7 +54,6 @@ init_coma(void)
                            .deep_min_pct = coma_deep_pct, .floor_fixed_w = coma_floor_w,
                            .hours = coma_hours };
     coma_init(&st, &c);
-    t_start = time(NULL);
     fprintf(stderr, "coma detection: %.0f s windows, idle = package power <= floor (%s) + %.2f W and "
             "deep package C-state residency >= %.0f%%; candidate after %.2f h of idle windows\n",
             coma_window_s, coma_floor_w > 0 ? "given" : "learned", coma_delta_w, coma_deep_pct, coma_hours);
@@ -77,6 +76,8 @@ update_coma(void)
 
     if (coma_hours <= 0)
         return;
+    if (!t_start)   /* the first tick covers the time since monitoring started */
+        t_start = time(NULL) - (time_t)(tick_secs + 0.5);
     deep_s = tick_deep_valid ? tick_deep_s : -1;
     if (!tick_deep_valid && !warned_no_deep) {
         warned_no_deep = 1;

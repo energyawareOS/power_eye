@@ -94,14 +94,17 @@ int main(void)
             t += secs;
             if (coma_feed(&s, 25.0 * secs, secs, 0.88 * secs, &w)) {
                 nwin++;
-                assert(fabs((w.end_s - w.start_s) - 600.0) < 0.01);
+                assert(w.end_s - w.start_s >= 600.0 - 0.01 && w.end_s - w.start_s <= 601.0);
                 if (nwin == 1) first_win_ticks = ticks;
                 if (w.coma_started) started_at = nwin;
             }
             /* the glue clamps with the time left in the window after this tick was fed */
             rem = (unsigned long)(coma_window_remaining_s(&s) * 1e6);
+            if (rem < as.base_us)       /* as in adaptive.c: no tiny remainder ticks */
+                rem = as.base_us;
             iv = adaptive_step(&as, 25.0, 88.0, iv, iv, rem, &ch);
             assert(iv <= rem + 1000);
+            assert(iv >= as.base_us);
         }
         assert(nwin == 18);
         assert(started_at == 6);
