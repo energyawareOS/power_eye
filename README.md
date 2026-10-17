@@ -166,7 +166,8 @@ Options:
     # COMA CANDIDATE: idle since 10-04 09:10:00 (1.00 h)
     # coma candidacy ended: busy window ending 10-04 12:30:00
     ```
-  With `-A`, the interval is cut so that ticks end on window boundaries, and besides power the deep residency now also resets the interval to `-i` when it moves by more than 10 percentage points. The verdict is made at a window end, so it comes at most one window after the idle time reaches `<hours>`. Without `-B` (or without a `cstate_pkg` PMU) there is no residency and the verdict uses power only, which is unreliable; a warning says so. A short burst inside a window is averaged away, as with `-A`. Example:
+  With `-A`, the interval is cut so that ticks end on window boundaries, and besides power the deep residency now also resets the interval to `-i` when it moves by more than 10 percentage points. The verdict is made at a window end, so it comes at most one window after the idle time reaches `<hours>`. Without `-B` (or without a `cstate_pkg` PMU) there is no residency and the verdict uses power only, which is unreliable; a warning says so. A short burst inside a window is averaged away, as with `-A`. Limitation: if the node has small periodic activity (e.g. 1-1.5 W every minute or so), changes larger than the `-T` band keep resetting the interval to `-i`, so it may take a long time to reach the cap. In a 90 minute server run the interval first reached 600 s after about 1 hour; the coma verdict itself was unaffected (see `results/coma-long/summary.md`). A wider `-T` reduces this at the cost of reacting less to real changes.
+  Example:
     ```bash
     sudo ./power_eye -B -d -i 1 -A 600 -C 6 -t 100000000 -f cEH
     ```
