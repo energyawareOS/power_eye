@@ -1,0 +1,7 @@
+condition,interval_s,run,pkg_power_w,deep_cstate_pct,wakeups_per_s,tool_idle_exits_per_s,source
+node_exporter,,1,44.684,0.0,575.448322,2.865329,smoke2/node_exporter
+none,,1,45.000333,0.0,612.12169,,smoke2/none
+fixed,1,1,44.815333,0.0,244.911233,2.009574,smoke2/pe1s
+node_exporter,,2,44.915333,0.0,590.916796,2.996408,smoke2/node_exporter
+none,,2,44.832,0.0,252.396492,,smoke2/none
+fixed,1,2,44.983,0.0,564.468846,1.976831,smoke2/pe1s

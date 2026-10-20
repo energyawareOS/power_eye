@@ -91,3 +91,23 @@ different `--max-rate` values and use the low-rate one for the cost at 1 Hz.
   applications and fix the CPU governor/turbo setting before measuring.
 - `BENCH_WINDOW_CMD` replaces the measured command (e.g. `sleep 5`); it exists
   only to test the plumbing without root.
+
+## Five-condition comparison and CSV export
+
+`run_conditions.sh` runs none / fixed (0.1, 1, 10 s) / adaptive (`-A 600`) /
+ebpf (`-B`) / node_exporter in one session and exports the raw per-run rows
+(no averaging) with `export_results.py`:
+
+```bash
+sudo tools/bench/run_conditions.sh results/conditions "BIOS: pkg C-state limit C6(retention), C6 on, C1E on, turbo off" 300 8 300
+```
+
+Outputs `results.csv` (`condition, interval_s, run, pkg_power_w,
+deep_cstate_pct, wakeups_per_s, tool_idle_exits_per_s`) and a short `env.txt`
+(CPU model, kernel, BIOS note, window); the full environment is kept as
+`env_full.txt`. `deep_cstate_pct` is package C6+C7 residency, `wakeups_per_s`
+is system-wide idle entries, `tool_idle_exits_per_s` is the observer's
+voluntary context switches (it does not include CPUs woken by IPI for sysfs
+RAPL reads). Run time is about 7 x trials x (settle + window + cooldown)
+(about 9.5 h with the defaults); the long settle lets `adaptive` reach its
+plateau before the window starts.
