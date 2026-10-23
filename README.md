@@ -9,6 +9,11 @@ It is implemented in C and built with CMake.
 - Optional DRAM domain power & energy (`-d`)
 - Optional system-wide power via IPMI (`-I`)
 - Optional GPU total and per-GPU power & energy via NVIDIA NVML (`-f g`, `-f G`)
+- Self-overhead reporting (`-f o`): CPU time, scheduled wakeups and RAPL reads of power_eye itself
+- Adaptive sampling interval (`-A`): doubles while power is steady, returns to the base interval on change
+- Optional eBPF sampler (`-B`): reads RAPL on CPU idle exits, so observing an idle system does not wake extra CPUs
+- Long-idle ("coma") candidate detection (`-C`) from window power and package C6 residency
+- Benchmark harness for the observer effect of monitoring tools (`tools/bench`)
 - Per-process attribution (`-p <pid>`): CPU energy is split by each pid's CPU utilization, and GPU energy is split by each pid's `nvmlDeviceGetProcessUtilization` SM utilization, weighted by per-device power on multi-GPU systems
 
 ## Requirements
@@ -24,13 +29,13 @@ It is implemented in C and built with CMake.
 Make sure you have CMake (version 3.22 or higher) and a C compiler installed.
 
 ```bash
-git clone https://github.com/your-username/power_eye.git
+git clone https://github.com/energyawareOS/power_eye.git
 cd power_eye
 cmake -B build
 cmake --build build
 ```
 
-After building, the executable will be available at `build/power_eye`.
+After building, the executable will be available at `build/src/power_eye`. The examples below call it as `power_eye`; use that path or copy it into your `PATH`. Unit tests: `ctest --test-dir build` (after `cmake --build build`).
 
 ### Build variants
 
@@ -62,7 +67,7 @@ cmake --build build
 ## Usage
 
 ```bash
-./power_eye [-i <interval>] [-t <timeout>] [-d] [-I] [-B] [-p <pid>]... [-A <max>] [-T <watts>] [-C <hours>] [-W <sec>] [-D <watts>] [-R <percent>] [-F <watts>] [-f <specs>] [-h]
+power_eye [-i <interval>] [-t <timeout>] [-d] [-I] [-B] [-p <pid>]... [-A <max>] [-T <watts>] [-C <hours>] [-W <sec>] [-D <watts>] [-R <percent>] [-F <watts>] [-f <specs>] [-h]
 ```
 
 Options:
@@ -169,25 +174,53 @@ Options:
   With `-A`, the interval is cut so that ticks end on window boundaries, and besides power the deep residency now also resets the interval to `-i` when it moves by more than 10 percentage points. The verdict is made at a window end, so it comes at most one window after the idle time reaches `<hours>`. Without `-B` (or without a `cstate_pkg` PMU) there is no residency and the verdict uses power only, which is unreliable; a warning says so. A short burst inside a window is averaged away, as with `-A`. Limitation: if the node has small periodic activity (e.g. 1-1.5 W every minute or so), changes larger than the `-T` band keep resetting the interval to `-i`, so it may take a long time to reach the cap. In a 90 minute server run the interval first reached 600 s after about 1 hour; the coma verdict itself was unaffected (see `results/coma-long/summary.md`). A wider `-T` reduces this at the cost of reacting less to real changes.
   Example:
     ```bash
-    sudo ./power_eye -B -d -i 1 -A 600 -C 6 -t 100000000 -f cEH
+    sudo power_eye -B -d -i 1 -A 600 -C 6 -t 100000000 -f cEH
     ```
 
 ## Examples
 
 - CPU power, with energy and header, sampled every 1s for 30s:
     ```bash
-    ./power_eye -t 30 -f cEH
+    power_eye -t 30 -f cEH
     ```
 
 - CPU + DRAM + GPU per-device, with energy and header:
     ```bash
-    ./power_eye -d -t 60 -f cGEH
+    power_eye -d -t 60 -f cGEH
     ```
 
 - Per-process CPU/GPU attribution for two pids:
     ```bash
-    ./power_eye -p 1234 -p 5678 -t 60 -f cgEH
+    power_eye -p 1234 -p 5678 -t 60 -f cgEH
     ```
+
+- Observation cost: add `o` (CPU time, wakeups and RAPL reads of power_eye itself):
+    ```bash
+    sudo power_eye -d -t 60 -f cEHo
+    ```
+
+- eBPF sampler (no IPI for RAPL reads; needs a `USE_BPF=ON` build):
+    ```bash
+    sudo power_eye -B -d -i 1 -t 60 -f cEHo
+    ```
+
+- Adaptive interval, 1 s base up to 10 minutes:
+    ```bash
+    sudo power_eye -B -d -i 1 -A 600 -t 3600 -f cEHo
+    ```
+
+- Long-idle detection: a coma candidate after 0.5 h of idle 10-minute windows, idle floor 25 W:
+    ```bash
+    sudo power_eye -B -d -i 1 -A 600 -C 0.5 -F 25.0 -t 5400 -f cEHo
+    ```
+
+## Observer effect and benchmarks
+
+A monitor is itself a load: every sample wakes a CPU, and a sysfs `energy_uj` read also wakes a CPU of each package by IPI. On the test server (2x Xeon E5-2650 v4, package C6 enabled) one sample cost about 15 mJ, below detection at 1 Hz and visible at 100 Hz. `-B` removes the remote wakeups and `-A` reduces the own wakeups when the system is idle.
+
+- `tools/bench`: A/B harness with a non-perturbing reference measurement (counters read only at the window start and end), paired statistics, dose-response regression, a five-condition runner (`run_conditions.sh`) and raw CSV export. See [tools/bench/README.md](tools/bench/README.md).
+- `tools/bpf-feasibility`, `tools/bpf-prototype`: probes and the standalone idle-exit sampler that `-B` is based on.
+- `results/coma-long`: a 90 minute run with `-A` and `-C`, and `results/compiled`: the data compiled from the experiments so far (`env.txt` explains where each row comes from; adaptive and node_exporter are not yet measured under the same conditions as the others).
 
 ## License
 
@@ -204,6 +237,11 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 - **Permissions**
   - Reading `energy_uj` may require elevated privileges. Use `sudo` or adjust permissions via a udev rule (distro-specific).
+  - `-B` needs root (perf events and BPF) and a kernel that exposes the `power` PMU; tested on Ubuntu with kernel 6.8. Package C6 residency (`-C`) needs the `cstate_pkg` PMU. If package C-states are disabled in the BIOS, residency is 0 and `-C` never reports idle.
+
+- **eBPF sampler (`-B`) and coma detection (`-C`)**
+  - Verified on a dual-socket Xeon E5-2650 v4 only. At sample rates of 20 Hz and above `-B` forces samples itself and behaves like sysfs.
+  - Short bursts are averaged away in long intervals; residency uses package C6 only.
 
 - **DRAM flag (`-d`)**
   - If your system lacks a DRAM RAPL domain, a warning is printed and DRAM output is disabled; the run continues with CPU only.
