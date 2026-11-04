@@ -111,3 +111,28 @@ voluntary context switches (it does not include CPUs woken by IPI for sysfs
 RAPL reads). Run time is about 7 x trials x (settle + window + cooldown)
 (about 9.5 h with the defaults); the long settle lets `adaptive` reach its
 plateau before the window starts.
+
+## Realistic-period comparison (interleaved)
+
+`run_realistic.sh` compares power_eye (sysfs and `-B` at `-i 1, 2, 4`), adaptive (`-A 600`), node_exporter +
+Prometheus (15 s scrape, default collectors; versions recorded in `env.txt`) on the same machine and BIOS state:
+
+```bash
+sudo tools/bench/run_realistic.sh results/realistic "BIOS: pkg C-state limit C6(retention), C6 on, C1E on, turbo off"
+DRY=1 tools/bench/run_realistic.sh results/realistic "..." 600 10   # estimate only
+```
+
+Design: 5-minute windows, 5 trials, `--interleave` (`none` before, between and after every scenario; scenario
+order shuffled in odd trials and reversed in even ones, so drift cancels), each run is paired with its neighbouring
+`none` runs by `aggregate.py`, adaptive gets a 600 s settle (`--settle-for`) so the interval has mostly ramped up
+before the window starts. Time: about 9 hours with the defaults (8 scenarios, 17 runs per trial). Window, trials and
+settle are the 3rd to 5th arguments; `DRY=1` prints the estimate. The 10-minute / 10-trial design takes about 35 h.
+
+Metrics: package power, deep C-state residency, system-wide idle entries per second, IPIs per second
+(`ipi_call_per_s`, `ipi_res_per_s` from `/proc/interrupts`, two reads per window), observer CPU time. Tool-induced
+idle exits are measured as the **system-wide idle-entry difference to the neighbouring baseline**, which includes CPUs
+woken by IPI (a per-process counter does not). `export_results.py` writes it as `tool_idle_exits_per_s`.
+
+`wake_energy.py DIR[:scenarios]...` regresses the paired power increase on the tool-induced idle entries (mJ per
+extra idle entry) and predicts the cost of low rates; see `results/wake-energy/summary.md` for the result on the
+existing 5/20/100 Hz data.

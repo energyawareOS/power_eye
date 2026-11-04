@@ -15,7 +15,8 @@
 set -u -o pipefail
 
 DUR=600 TRIALS=5 SETTLE=60 COOLDOWN=10 TRACE_DUR=120
-OUT="" NOTE="" SEED="" TRACE=0 IPMI=0 DRY=0 BASELINE=1 TURBOSTAT=1
+OUT="" NOTE="" SEED="" TRACE=0 IPMI=0 DRY=0 BASELINE=1 TURBOSTAT=1 INTERLEAVE=0
+declare -A SETTLE_OF=()
 SC_NAME=() SC_CMD=()
 SYS=/sys/devices/system/cpu
 
@@ -31,6 +32,11 @@ Usage: sudo $0 -o OUTDIR [options] -S name=command [-S name=command ...]
   -S name=cmd      Observer scenario; the command is exec'd in its own session
                    and must not need sudo. Baseline "none" is added implicitly.
   --no-baseline    Do not add the implicit "none" scenario
+  --interleave     Run "none" before, between and after every scenario of a trial
+                   (none,A,none,B,none,...). The scenario order is shuffled in odd
+                   trials and reversed in even ones, so drift cancels. aggregate.py
+                   then pairs each run with its neighbouring "none" runs.
+  --settle-for N=SEC  Settle time for scenario N only (e.g. adaptive needs a long ramp-up)
   --no-turbostat   Use only perf stat for the window
   --trace [SEC]    Extra bpftrace pass per run counting idle exits (default $TRACE_DUR s)
   --ipmi           Record 'ipmitool dcmi power reading' before/after (unvalidated)
@@ -58,6 +64,10 @@ while [ $# -gt 0 ]; do
         [[ $n =~ ^[A-Za-z0-9_.-]+$ ]] || die "bad scenario name: $n"
         SC_NAME+=("$n"); SC_CMD+=("${2#*=}"); shift 2 ;;
     --no-baseline) BASELINE=0; shift ;;
+    --interleave) INTERLEAVE=1; shift ;;
+    --settle-for)
+        [[ $2 =~ ^[A-Za-z0-9_.-]+=[0-9]+$ ]] || die "--settle-for expects name=seconds"
+        SETTLE_OF[${2%%=*}]=${2#*=}; shift 2 ;;
     --no-turbostat) TURBOSTAT=0; shift ;;
     --trace)
         TRACE=1
@@ -122,13 +132,14 @@ capture_env() {
         echo "# bench.sh environment, $(date -Is)"
         echo "note: ${NOTE:-<none>}"
         [ -n "$NOTE" ] || echo "WARNING: no --note; record BIOS C-state settings by hand (not readable from the OS)"
-        echo "window=${DUR}s trials=$TRIALS settle=${SETTLE}s cooldown=${COOLDOWN}s trace=$TRACE ipmi=$IPMI"
+        echo "window=${DUR}s trials=$TRIALS settle=${SETTLE}s cooldown=${COOLDOWN}s trace=$TRACE ipmi=$IPMI interleave=$INTERLEAVE"
+        for k in "${!SETTLE_OF[@]}"; do echo "settle_for_$k=${SETTLE_OF[$k]}s"; done
         echo "events=$EV"
         echo "scenarios:"
         for i in "${!SC_NAME[@]}"; do echo "  ${SC_NAME[$i]}: ${SC_CMD[$i]:-<idle baseline>}"; done
         echo
         for c in "uname -a" "cat /proc/cmdline" "lscpu" "perf --version" "turbostat --version" \
-                 "bpftrace --version" "cpupower idle-info" "cpupower frequency-info -p" \
+                 "bpftrace --version" "node_exporter --version" "prometheus --version" "cpupower idle-info" "cpupower frequency-info -p" \
                  "dmidecode -s bios-vendor" "dmidecode -s bios-version" "dmidecode -s bios-release-date" \
                  "dmidecode -s processor-version" "ipmitool mc info"; do
             echo "## $c"
@@ -188,6 +199,10 @@ snap_idle_remote() { # fallback without taskset: biased high on short windows
             "$(<"$d/usage")" "$(<"$d/time")" "$(<"$d/latency")"
     done > "$1"
 }
+
+# IPIs delivered system-wide (x86: CAL = function-call IPIs, e.g. remote RAPL/MSR
+# reads; RES = reschedule IPIs). Two reads per window, no perturbation.
+snap_irq() { awk '$1=="CAL:"||$1=="RES:"{n=0; for(i=2;i<=NF;i++) if($i ~ /^[0-9]+$/) n+=$i; print $1, n}' /proc/interrupts | tr -d ':' > "$1"; }
 
 snap_stat() { awk '$1=="intr"||$1=="ctxt"{print $1, $2}' /proc/stat > "$1"; }
 
@@ -283,13 +298,15 @@ timed() { # name cmd...
 run_one() { # trial pos name cmd
     local trial=$1 pos=$2 name=$3 cmd=$4
     local dir="$OUT/raw/$(printf '%03d' "$trial")_$name"
+    [ "$INTERLEAVE" = 1 ] && dir="$OUT/raw/$(printf '%03d_%02d' "$trial" "$pos")_$name"
     mkdir -p "$dir"; DIR=$dir
     start_observer "$name" "$cmd" "$dir" || { stop_observer; return 1; }
-    sleep "$SETTLE"
+    sleep "${SETTLE_OF[$name]:-$SETTLE}"
 
     # Slow snapshots first, cpuidle last so it hugs the measured window.
     timed pre.obs snap_obs "$OBS_PID" "$dir/pre.obs"
     timed pre.stat snap_stat "$dir/pre.stat"
+    timed pre.irq snap_irq "$dir/pre.irq"
     snap_ipmi "$dir/pre.ipmi"
     timed pre.idle snap_idle "$dir/pre.idle"
     local t0 t1; t0=$(now)
@@ -297,6 +314,7 @@ run_one() { # trial pos name cmd
     t1=$(now)
     timed post.idle snap_idle "$dir/post.idle"
     timed post.stat snap_stat "$dir/post.stat"
+    timed post.irq snap_irq "$dir/post.irq"
     timed post.obs snap_obs "$OBS_PID" "$dir/post.obs"
     snap_ipmi "$dir/post.ipmi"
 
@@ -364,14 +382,34 @@ fi
 if [ "$DRY" = 1 ]; then
     echo "DRY RUN. Environment written to $OUT/env.txt"
     echo "window command: $(window_cmd "$OUT/raw/<run>")"
-    total=$(( TRIALS * ${#SC_NAME[@]} * (DUR + SETTLE + COOLDOWN + 1) ))
+    runs=${#SC_NAME[@]}
+    [ "$INTERLEAVE" = 1 ] && runs=$(( 2 * ${#SC_NAME[@]} - 1 ))
+    total=$(( TRIALS * runs * (DUR + SETTLE + COOLDOWN + 1) ))
+    for k in "${!SETTLE_OF[@]}"; do total=$(( total + TRIALS * (${SETTLE_OF[$k]} - SETTLE) )); done
     for i in "${!SC_NAME[@]}"; do echo "scenario ${SC_NAME[$i]}: ${SC_CMD[$i]:-<idle baseline>}"; done
     echo "approx. total time: $(( total / 60 )) min (+ trace passes)"
     exit 0
 fi
 
+NONE_I=""; CONDS=()
+for i in "${!SC_NAME[@]}"; do
+    if [ "${SC_NAME[$i]}" = none ]; then NONE_I=$i; else CONDS+=("$i"); fi
+done
+if [ "$INTERLEAVE" = 1 ] && [ -z "$NONE_I" ]; then die "--interleave needs the none baseline"; fi
+
 for trial in $(seq 1 "$TRIALS"); do
-    mapfile -t order < <(printf '%s\n' "${!SC_NAME[@]}" | shuffle "$trial")
+    if [ "$INTERLEAVE" = 1 ]; then
+        # shuffled order in odd trials, the previous order reversed in even ones
+        if [ $((trial % 2)) = 1 ]; then
+            mapfile -t cur < <(printf '%s\n' "${CONDS[@]}" | shuffle "$trial")
+        else
+            mapfile -t cur < <(printf '%s\n' "${cur[@]}" | tac)
+        fi
+        order=("$NONE_I")
+        for i in "${cur[@]}"; do order+=("$i" "$NONE_I"); done
+    else
+        mapfile -t order < <(printf '%s\n' "${!SC_NAME[@]}" | shuffle "$trial")
+    fi
     pos=0
     for i in "${order[@]}"; do
         pos=$((pos + 1))

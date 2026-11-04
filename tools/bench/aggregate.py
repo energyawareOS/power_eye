@@ -22,7 +22,7 @@ T95 = [12.706, 4.303, 3.182, 2.776, 2.571, 2.447, 2.365, 2.306, 2.262, 2.228,
 
 KEY_METRICS = [
     "pkg_W", "ram_W", "deep_resid_pct", "core_c6_pct", "pkg_c2_pct", "pkg_c6_pct", "idle_entries_per_s", "intr_per_s",
-    "ctxt_per_s", "obs_vol_ctxt_per_s", "obs_cpu_ms_per_s",
+    "ctxt_per_s", "ipi_call_per_s", "ipi_res_per_s", "obs_vol_ctxt_per_s", "obs_cpu_ms_per_s",
     "idle_exit_total_per_s", "idle_exit_obs_per_s", "ts_Pkg%pc6", "ts_PkgWatt",
     "ipmi_avg_W",
 ]
@@ -223,6 +223,19 @@ def ols(xs, ys):
     return a, b, t * se, (1 - sse / sst) if sst else float("nan"), n
 
 
+def baseline_rows(rows, r, baseline="none"):
+    """Baseline runs to pair with r: the neighbouring baseline runs of the same trial
+    (pos +-1, interleaved design), else every baseline run of that trial."""
+    same = [b for b in rows if b["scenario"] == baseline and b["trial"] == r["trial"]]
+    near = [b for b in same if abs(b["pos"] - r["pos"]) == 1]
+    return near or same
+
+
+def baseline_mean(rows, r, key, baseline="none"):
+    v = [b[key] for b in baseline_rows(rows, r, baseline) if key in b]
+    return statistics.fmean(v) if v else None
+
+
 def run_metrics(d, deep_lat_us):
     meta = read_kv(os.path.join(d, "meta"))
     outer = float(meta["t1"]) - float(meta["t0"])
@@ -246,6 +259,12 @@ def run_metrics(d, deep_lat_us):
         ws = span("stat")
         row["intr_per_s"] = (s1["intr"] - s0["intr"]) / ws
         row["ctxt_per_s"] = (s1["ctxt"] - s0["ctxt"]) / ws
+    i0, i1 = read_pairs(os.path.join(d, "pre.irq")), read_pairs(os.path.join(d, "post.irq"))
+    if "CAL" in i0 and "CAL" in i1:
+        wi = span("irq")
+        row["ipi_call_per_s"] = (i1["CAL"] - i0["CAL"]) / wi
+        if "RES" in i0 and "RES" in i1:
+            row["ipi_res_per_s"] = (i1["RES"] - i0["RES"]) / wi
     o0, o1 = read_obs(os.path.join(d, "pre.obs")), read_obs(os.path.join(d, "post.obs"))
     common = set(o0) & set(o1)  # processes alive at both ends
     if common:
@@ -405,7 +424,8 @@ def main():
 
     base = {r["trial"]: r for r in rows if r["scenario"] == args.baseline}
     if base:
-        lines += ["", "## Paired difference vs `%s` (same trial)" % args.baseline, "",
+        lines += ["", "## Paired difference vs `%s` (same trial; neighbouring runs if interleaved)"
+                  % args.baseline, "",
                   "`*` = 95% CI excludes 0. Observer-only metrics (`obs_*`, `idle_exit_obs_*`) "
                   "count as 0 in the baseline.", "",
                   "| scenario | n | " + " | ".join(metrics) + " |",
@@ -417,8 +437,14 @@ def main():
             cells = []
             for m in metrics:
                 zero = 0.0 if m.startswith(("obs_", "idle_exit_obs")) else None
-                diffs = [r[m] - base[r["trial"]].get(m, zero) for r in sr
-                         if m in r and base[r["trial"]].get(m, zero) is not None]
+                diffs = []
+                for r in sr:
+                    if m not in r:
+                        continue
+                    b = baseline_mean(rows, r, m, args.baseline)
+                    b = zero if b is None else b
+                    if b is not None:
+                        diffs.append(r[m] - b)
                 mm, ci, _ = mean_ci(diffs)
                 star = "*" if mm is not None and ci is not None and abs(mm) > ci else ""
                 cells.append(fmt(mm, ci) + star)

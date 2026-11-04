@@ -5,30 +5,39 @@ Reads OUTDIR/runs.csv (made by aggregate.py) and OUTDIR/env.txt (made by
 bench.sh); writes OUTDIR/results.csv and OUTDIR/env.txt (overwritten with a
 short summary; the full bench environment is kept as env_full.txt).
 
-Scenario names -> condition: none, fixed_<interval>, adaptive, ebpf,
-node_exporter. Anything else is an error, so nothing is silently relabeled.
+Scenario names -> condition: none, fixed_<interval> (sysfs), ebpf_<interval>
+(-B, fixed interval), adaptive, ebpf, node_exporter, scaphandre. interval_s is
+set for fixed_* and ebpf_*. Anything else is an error, so nothing is silently
+relabeled.
 
 Columns:
   pkg_power_w            pkg_W (RAPL energy-pkg over the window)
   deep_cstate_pct        pkg_c6_pct + pkg_c7_pct (package C6 or deeper)
   wakeups_per_s          idle_entries_per_s (system-wide, all CPUs)
-  tool_idle_exits_per_s  obs_vol_ctxt_per_s: voluntary context switches of the
-                         observer, i.e. how often it was put on a CPU after
-                         sleeping. It does NOT count CPUs woken by IPI for
-                         sysfs RAPL reads. Empty for 'none'.
+  tool_idle_exits_per_s  extra system-wide idle entries per second compared with the
+                         neighbouring `none` runs of the same trial (idle_entries_per_s
+                         minus their mean). Because it is system-wide it includes CPUs
+                         woken by IPI for remote RAPL reads. Noisy per run (it is a
+                         difference of two ~400/s counts); use means over runs.
+                         If the run has no `none` neighbour (non-interleaved data
+                         without a baseline) it is empty, also for `none` itself.
+  source                 <results dir>/<scenario>
+  tool_cpu_ms_per_s      CPU time of the observer (all its processes) per second
 """
 import csv, os, re, shutil, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from aggregate import baseline_mean
 
 FIELDS = ["condition", "interval_s", "run", "pkg_power_w", "deep_cstate_pct",
-          "wakeups_per_s", "tool_idle_exits_per_s"]
+          "wakeups_per_s", "tool_idle_exits_per_s", "source", "tool_cpu_ms_per_s"]
 
 
 def condition(name):
-    if name in ("none", "adaptive", "ebpf", "node_exporter"):
+    if name in ("none", "adaptive", "ebpf", "node_exporter", "scaphandre"):
         return name, ""
-    m = re.fullmatch(r"fixed_([0-9.]+)", name)
+    m = re.fullmatch(r"(fixed|ebpf)_([0-9.]+)", name)
     if m:
-        return "fixed", m.group(1)
+        return m.group(1), m.group(2)
     raise SystemExit("unknown scenario name %r (expected none, fixed_<s>, "
                      "adaptive, ebpf, node_exporter)" % name)
 
@@ -38,17 +47,24 @@ def num(row, key):
     return float(v) if v not in ("", None) else None
 
 
-def export(rows):
+def export(rows, src="", numeric=None):
     out = []
     for r in rows:
         cond, iv = condition(r["scenario"])
         p6, p7 = num(r, "pkg_c6_pct"), num(r, "pkg_c7_pct")
         deep = None if p6 is None else p6 + (p7 or 0.0)
-        vals = [num(r, "pkg_W"), deep, num(r, "idle_entries_per_s"),
-                num(r, "obs_vol_ctxt_per_s")]
+        tool = None
+        if cond != "none" and numeric is not None:
+            b = baseline_mean(numeric, numeric[r["_i"]], "idle_entries_per_s")
+            e = num(r, "idle_entries_per_s")
+            if b is not None and e is not None:
+                tool = e - b
+        vals = [num(r, "pkg_W"), deep, num(r, "idle_entries_per_s"), tool]
         out.append([cond, iv, r["trial"]] +
-                   ["" if v is None else repr(round(v, 6)) for v in vals])
-    out.sort(key=lambda x: (x[0], float(x[1] or 0), int(x[2])))
+                   ["" if v is None else repr(round(v, 6)) for v in vals] +
+                   ["%s/%s" % (src, r["scenario"]),
+                    "" if num(r, "obs_cpu_ms_per_s") is None else repr(round(num(r, "obs_cpu_ms_per_s"), 6))])
+    out.sort(key=lambda x: (x[0], float(x[1] or 0), int(x[2]), x[7]))
     return out
 
 
@@ -66,7 +82,14 @@ def main():
     with open(os.path.join(d, "results.csv"), "w", newline="") as f:
         w = csv.writer(f)
         w.writerow(FIELDS)
-        w.writerows(export(rows))
+        numeric = []
+        for i, r in enumerate(rows):
+            r["_i"] = i
+            numeric.append({"scenario": r["scenario"], "trial": int(r["trial"]),
+                            "pos": int(r["pos"] or 0),
+                            **({"idle_entries_per_s": float(r["idle_entries_per_s"])}
+                               if r.get("idle_entries_per_s") else {})})
+        w.writerows(export(rows, os.path.basename(os.path.normpath(d)), numeric))
 
     envp = os.path.join(d, "env.txt")
     full = os.path.join(d, "env_full.txt")

@@ -16,18 +16,21 @@ def write(path, text):
         f.write(text)
 
 
-def make_run(out, trial, scen, pkg_j, c6_us, entries, vol0, vol1, trace=None, cmd=""):
-    d = os.path.join(out, "raw", "%03d_%s" % (trial, scen))
+def make_run(out, trial, scen, pkg_j, c6_us, entries, vol0, vol1, trace=None, cmd="", pos=1, cal=None):
+    d = os.path.join(out, "raw", "%03d_%02d_%s" % (trial, pos, scen))
     os.makedirs(d)
     write(os.path.join(d, "meta"),
-          "scenario=%s\ntrial=%d\npos=1\ndur=100\nt0=1000.0\nt1=%.1f\n"
+          "scenario=%s\ntrial=%d\npos=%d\ndur=100\nt0=1000.0\nt1=%.1f\n"
           "trace_dur=%d\nobs_pid=1\nobs_comm=x\ncmd=%s\nn_pkg=2\nn_core=24\n" %
-          (scen, trial, 1000.0 + WINDOW + 3.0, 10 if trace else 0, cmd))  # outer window is 3 s longer
+          (scen, trial, pos, 1000.0 + WINDOW + 3.0, 10 if trace else 0, cmd))  # outer window is 3 s longer
     # snapshots span exactly WINDOW even though the outer window is longer
     write(os.path.join(d, "times"),
           "pre.obs 999.0 1001.0\npost.obs 1099.0 1101.0\n"
           "pre.stat 999.9 1000.1\npost.stat 1099.9 1100.1\n"
-          "pre.idle 1000.0 1000.0\npost.idle 1100.0 1100.0\n")
+          "pre.idle 1000.0 1000.0\npost.idle 1100.0 1100.0\n"
+          "pre.irq 999.9 1000.1\npost.irq 1099.9 1100.1\n")
+    write(os.path.join(d, "pre.irq"), "CAL 1000\nRES 500\n")
+    write(os.path.join(d, "post.irq"), "CAL %d\nRES 1500\n" % (1000 + (cal or 0)))
     pre = post = ""
     for cpu in range(NCPU):
         pre += "%d\t0\tPOLL\t0\t0\t0\n%d\t1\tC1\t0\t0\t1\n%d\t2\tC6\t0\t0\t133\n" % (cpu, cpu, cpu)
@@ -83,6 +86,29 @@ class AggregateTest(unittest.TestCase):
             self.assertIn("Paired difference", summary)
             self.assertIn("1.000", summary)  # 100 J more over 100 s -> +1.000 W
             self.assertRegex(summary, r"1\.000 ± 0\.000\*")
+
+
+class InterleaveTest(unittest.TestCase):
+    def test_pairs_with_neighbouring_baselines(self):
+        with tempfile.TemporaryDirectory() as out:
+            make_run(out, 1, "none", 500.0, 90_000_000, 200, 0, 0, pos=1)
+            make_run(out, 1, "obs", 600.0, 90_000_000, 200, 0, 0, pos=2, cal=3000)
+            make_run(out, 1, "none", 520.0, 90_000_000, 200, 0, 0, pos=3)
+            make_run(out, 1, "obs2", 700.0, 90_000_000, 200, 0, 0, pos=4)
+            make_run(out, 1, "none", 580.0, 90_000_000, 200, 0, 0, pos=5)
+            subprocess.run([sys.executable, os.path.join(HERE, "aggregate.py"), out],
+                           check=True, stdout=subprocess.DEVNULL)
+            with open(os.path.join(out, "runs.csv")) as f:
+                rows = [r for r in csv.DictReader(f)]
+            self.assertEqual(len(rows), 5)
+            o = [r for r in rows if r["scenario"] == "obs"][0]
+            self.assertAlmostEqual(float(o["ipi_call_per_s"]), 30.0)   # 3000 IPIs / 100 s
+            self.assertAlmostEqual(float(o["ipi_res_per_s"]), 10.0)
+            with open(os.path.join(out, "summary.md")) as f:
+                text = f.read()
+            # obs: 6.00 W vs mean(5.00, 5.20) = 5.10 -> +0.900; obs2: 7.00 vs mean(5.20, 5.80) = 5.50 -> +1.500
+            self.assertRegex(text, r"\| obs \| 1 \|[^\n]*0\.900")
+            self.assertRegex(text, r"\| obs2 \| 1 \|[^\n]*1\.500")
 
 
 class DoseResponseTest(unittest.TestCase):

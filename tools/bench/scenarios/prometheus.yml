@@ -1,0 +1,7 @@
+# Prometheus scraping a local node_exporter every 15 s (default node_exporter collectors).
+global:
+  scrape_interval: 15s
+scrape_configs:
+  - job_name: node
+    static_configs:
+      - targets: ["127.0.0.1:9100"]
