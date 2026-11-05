@@ -46,9 +46,13 @@ def main():
         hold = float(args[1]); args = args[2:]
     if not args:
         sys.exit(__doc__)
+    tests = []
+    if "--test" in args:
+        i = args.index("--test"); tests = args[i + 1:]; args = args[:i]
     pts = [p for a in args for p in load(a)]
     fit = [p for p in pts if p["rate"] > hold]
     test = [p for p in pts if p["rate"] == hold]
+    tpts = [p for a in tests for p in load(a)]
     L = ["# Energy per tool-induced wakeup", "",
          "Sources: " + ", ".join(args), "",
          "Paired differences vs `none` of the same trial. dW = extra system-wide idle "
@@ -95,6 +99,19 @@ def main():
             meas, nn = "not measured", "-"
         L.append("| %d | %g | %.0f ± %.0f | %s | %s |" % (
             iv, rate, pred, t * se0 * wpt * rate, meas, nn))
+    if tpts:
+        L += ["", "## Held-out runs (not in the fit)", "",
+              "| source/scenario | rate Hz | n | predicted dP mW | measured dP mW | measured dW /s |",
+              "|---|---|---|---|---|---|"]
+        g = collections.defaultdict(list)
+        for p in tpts:
+            g[(p["src"], p["scen"], p["rate"])].append(p)
+        for (src, sc, rate), v in sorted(g.items(), key=lambda kv: -kv[0][2]):
+            mp, cp, n_ = mean_ci([p["dP"] for p in v])
+            mw, cw, _ = mean_ci([p["dW"] for p in v])
+            L.append("| %s/%s | %g | %d | %.0f ± %.0f | %.0f ± %.0f | %.0f ± %.0f |" % (
+                os.path.basename(src), sc, rate, n_, b0 * wpt * rate, t * se0 * wpt * rate,
+                mp, cp or 0, mw, cw or 0))
     L += ["", "The measured 1 Hz difference is compared with the prediction; if the CI of the "
           "measurement contains the prediction the model is consistent, but a CI wider than the "
           "predicted value means the test cannot discriminate (package power noise ~0.25 W)."]

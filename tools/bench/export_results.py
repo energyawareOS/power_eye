@@ -110,8 +110,9 @@ def main():
         f.write("runs: %d rows, scenarios: %s\n" % (
             len(rows), ", ".join(sorted({r["scenario"] for r in rows}))))
         f.write("columns: see tools/bench/export_results.py (deep_cstate_pct = "
-                "pkg C6 + C7; tool_idle_exits_per_s = observer voluntary "
-                "context switches, excludes IPI wakeups)\n")
+                "pkg C6 + C7; tool_idle_exits_per_s = system-wide idle entries minus "
+                "the neighbouring none runs, includes IPI-woken CPUs; "
+                "tool_cpu_ms_per_s = observer CPU time)\n")
         f.write("full environment: env_full.txt\n")
 
 

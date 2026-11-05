@@ -1,0 +1,152 @@
+[trial 1/5] none (pos 1)
+[trial 1/5] node_exporter (pos 2)
+[trial 1/5] none (pos 3)
+[trial 1/5] ebpf_4 (pos 4)
+[trial 1/5] none (pos 5)
+[trial 1/5] fixed_1 (pos 6)
+[trial 1/5] none (pos 7)
+[trial 1/5] fixed_4 (pos 8)
+[trial 1/5] none (pos 9)
+[trial 1/5] fixed_2 (pos 10)
+[trial 1/5] none (pos 11)
+[trial 1/5] ebpf_2 (pos 12)
+[trial 1/5] none (pos 13)
+[trial 1/5] ebpf_1 (pos 14)
+[trial 1/5] none (pos 15)
+[trial 1/5] adaptive (pos 16)
+[trial 1/5] none (pos 17)
+[trial 2/5] none (pos 1)
+[trial 2/5] adaptive (pos 2)
+[trial 2/5] none (pos 3)
+[trial 2/5] ebpf_1 (pos 4)
+[trial 2/5] none (pos 5)
+[trial 2/5] ebpf_2 (pos 6)
+[trial 2/5] none (pos 7)
+[trial 2/5] fixed_2 (pos 8)
+[trial 2/5] none (pos 9)
+[trial 2/5] fixed_4 (pos 10)
+[trial 2/5] none (pos 11)
+[trial 2/5] fixed_1 (pos 12)
+[trial 2/5] none (pos 13)
+[trial 2/5] ebpf_4 (pos 14)
+[trial 2/5] none (pos 15)
+[trial 2/5] node_exporter (pos 16)
+[trial 2/5] none (pos 17)
+[trial 3/5] none (pos 1)
+[trial 3/5] ebpf_2 (pos 2)
+[trial 3/5] none (pos 3)
+[trial 3/5] fixed_2 (pos 4)
+[trial 3/5] none (pos 5)
+[trial 3/5] fixed_1 (pos 6)
+[trial 3/5] none (pos 7)
+[trial 3/5] adaptive (pos 8)
+[trial 3/5] none (pos 9)
+[trial 3/5] node_exporter (pos 10)
+[trial 3/5] none (pos 11)
+[trial 3/5] fixed_4 (pos 12)
+[trial 3/5] none (pos 13)
+[trial 3/5] ebpf_4 (pos 14)
+[trial 3/5] none (pos 15)
+[trial 3/5] ebpf_1 (pos 16)
+[trial 3/5] none (pos 17)
+[trial 4/5] none (pos 1)
+[trial 4/5] ebpf_1 (pos 2)
+[trial 4/5] none (pos 3)
+[trial 4/5] ebpf_4 (pos 4)
+[trial 4/5] none (pos 5)
+[trial 4/5] fixed_4 (pos 6)
+[trial 4/5] none (pos 7)
+[trial 4/5] node_exporter (pos 8)
+[trial 4/5] none (pos 9)
+[trial 4/5] adaptive (pos 10)
+[trial 4/5] none (pos 11)
+[trial 4/5] fixed_1 (pos 12)
+[trial 4/5] none (pos 13)
+[trial 4/5] fixed_2 (pos 14)
+[trial 4/5] none (pos 15)
+[trial 4/5] ebpf_2 (pos 16)
+[trial 4/5] none (pos 17)
+[trial 5/5] none (pos 1)
+[trial 5/5] ebpf_4 (pos 2)
+[trial 5/5] none (pos 3)
+[trial 5/5] node_exporter (pos 4)
+[trial 5/5] none (pos 5)
+[trial 5/5] ebpf_2 (pos 6)
+[trial 5/5] none (pos 7)
+[trial 5/5] ebpf_1 (pos 8)
+[trial 5/5] none (pos 9)
+[trial 5/5] fixed_1 (pos 10)
+[trial 5/5] none (pos 11)
+[trial 5/5] fixed_4 (pos 12)
+[trial 5/5] none (pos 13)
+[trial 5/5] adaptive (pos 14)
+[trial 5/5] none (pos 15)
+[trial 5/5] fixed_2 (pos 16)
+[trial 5/5] none (pos 17)
+done. Aggregate with: /home/cezanne/work/power_eye/tools/bench/aggregate.py results/realistic
+# Observer-effect summary
+
+## Warnings
+
+- trial 2 ebpf_2: pkg_W 25.86 W is an outlier (median of ebpf_2 25.48 W, idle entries 518/s); other activity during the window? see raw/002_ebpf_2
+- 4 observer runs show zero wakeups and zero CPU: the observer may be blocked or an unrelated process is being tracked (see obs_comm in raw/*/meta)
+
+Mean ± 95% CI over trials. Baseline scenario: `none`.
+
+## Per scenario
+
+| scenario | n | pkg_W | ram_W | deep_resid_pct | core_c6_pct | pkg_c2_pct | pkg_c6_pct | idle_entries_per_s | intr_per_s | ctxt_per_s | ipi_call_per_s | ipi_res_per_s | obs_vol_ctxt_per_s | obs_cpu_ms_per_s | ts_Pkg%pc6 | ts_PkgWatt |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| none | 45 | 25.531 ± 0.044 | 3.711 ± 0.009 | 99.905 ± 0.015 | 99.614 ± 0.041 | 10.466 ± 0.044 | 86.445 ± 0.097 | 393.953 ± 26.670 | 376.702 ± 25.846 | 389.611 ± 12.786 | 0.749 ± 0.153 | 0.523 ± 0.094 | - | - | 86.432 ± 0.097 | 25.534 ± 0.044 |
+| adaptive | 5 | 25.395 ± 0.030 | 3.673 ± 0.016 | 99.945 ± 0.002 | 99.730 ± 0.004 | 10.501 ± 0.081 | 86.722 ± 0.124 | 313.215 ± 4.198 | 298.856 ± 4.567 | 350.192 ± 5.743 | 0.519 ± 0.048 | 0.206 ± 0.103 | 0.001 ± 0.002 | 0.000 ± 0.001 | 86.710 ± 0.124 | 25.398 ± 0.032 |
+| ebpf_1 | 5 | 25.532 ± 0.168 | 3.713 ± 0.053 | 99.919 ± 0.059 | 99.659 ± 0.152 | 10.646 ± 0.155 | 86.272 ± 0.303 | 365.338 ± 97.953 | 348.505 ± 96.436 | 385.737 ± 49.722 | 0.563 ± 0.196 | 0.391 ± 0.284 | 0.999 ± 0.002 | 0.208 ± 0.001 | 86.260 ± 0.301 | 25.536 ± 0.168 |
+| ebpf_2 | 5 | 25.594 ± 0.259 | 3.710 ± 0.046 | 99.898 ± 0.073 | 99.602 ± 0.202 | 10.604 ± 0.112 | 86.167 ± 0.598 | 402.213 ± 137.900 | 383.744 ± 134.014 | 399.689 ± 76.133 | 0.728 ± 0.422 | 0.516 ± 0.431 | 0.500 ± 0.002 | 0.105 ± 0.000 | 86.154 ± 0.598 | 25.596 ± 0.259 |
+| ebpf_4 | 5 | 25.449 ± 0.052 | 3.703 ± 0.029 | 99.942 ± 0.003 | 99.720 ± 0.014 | 10.574 ± 0.105 | 86.522 ± 0.251 | 326.604 ± 20.129 | 310.698 ± 18.780 | 373.502 ± 39.199 | 0.487 ± 0.059 | 0.242 ± 0.072 | 0.250 ± 0.002 | 0.054 ± 0.000 | 86.510 ± 0.250 | 25.448 ± 0.051 |
+| fixed_1 | 5 | 25.602 ± 0.194 | 3.713 ± 0.036 | 99.883 ± 0.073 | 99.552 ± 0.193 | 10.517 ± 0.170 | 86.240 ± 0.272 | 434.092 ± 126.171 | 412.060 ± 121.993 | 407.483 ± 55.277 | 0.758 ± 0.327 | 0.674 ± 0.559 | 2.934 ± 0.186 | 0.224 ± 0.003 | 86.228 ± 0.275 | 25.604 ± 0.192 |
+| fixed_2 | 5 | 25.429 ± 0.053 | 3.694 ± 0.022 | 99.945 ± 0.001 | 99.719 ± 0.014 | 10.639 ± 0.119 | 86.492 ± 0.251 | 326.440 ± 14.428 | 308.856 ± 13.549 | 369.196 ± 32.500 | 0.526 ± 0.025 | 0.237 ± 0.041 | 1.400 ± 0.279 | 0.111 ± 0.003 | 86.480 ± 0.248 | 25.432 ± 0.054 |
+| fixed_4 | 5 | 25.639 ± 0.271 | 3.711 ± 0.029 | 99.882 ± 0.070 | 99.549 ± 0.190 | 10.483 ± 0.214 | 86.218 ± 0.505 | 438.031 ± 122.796 | 418.598 ± 119.604 | 416.863 ± 43.631 | 0.803 ± 0.326 | 0.638 ± 0.517 | 0.749 ± 0.000 | 0.058 ± 0.002 | 86.204 ± 0.508 | 25.642 ± 0.272 |
+| node_exporter | 5 | 25.833 ± 0.073 | 3.817 ± 0.017 | 99.839 ± 0.004 | 99.543 ± 0.009 | 11.107 ± 0.176 | 84.929 ± 0.243 | 493.813 ± 11.346 | 424.434 ± 10.551 | 655.465 ± 9.658 | 4.948 ± 0.263 | 0.360 ± 0.060 | 86.154 ± 4.177 | 11.567 ± 0.229 | 84.918 ± 0.241 | 25.836 ± 0.069 |
+
+## C-state residency (% of all CPU time)
+
+| scenario | nonidle | C1E | C1 | C3 | C6 | POLL |
+|---|---|---|---|---|---|---|
+| none | 0.1 | 0.0 | 0.0 | 0.1 | 99.8 | 0.0 |
+| adaptive | 0.0 | 0.0 | 0.0 | 0.1 | 99.9 | 0.0 |
+| ebpf_1 | 0.1 | 0.0 | 0.0 | 0.1 | 99.8 | 0.0 |
+| ebpf_2 | 0.1 | 0.0 | 0.0 | 0.1 | 99.8 | 0.0 |
+| ebpf_4 | 0.0 | 0.0 | 0.0 | 0.1 | 99.8 | 0.0 |
+| fixed_1 | 0.1 | 0.0 | 0.0 | 0.1 | 99.8 | 0.0 |
+| fixed_2 | 0.0 | 0.0 | 0.0 | 0.1 | 99.9 | 0.0 |
+| fixed_4 | 0.1 | 0.0 | 0.0 | 0.1 | 99.8 | 0.0 |
+| node_exporter | 0.1 | 0.0 | 0.0 | 0.1 | 99.7 | 0.0 |
+
+## Paired difference vs `none` (same trial; neighbouring runs if interleaved)
+
+`*` = 95% CI excludes 0. Observer-only metrics (`obs_*`, `idle_exit_obs_*`) count as 0 in the baseline.
+
+| scenario | n | pkg_W | ram_W | deep_resid_pct | core_c6_pct | pkg_c2_pct | pkg_c6_pct | idle_entries_per_s | intr_per_s | ctxt_per_s | ipi_call_per_s | ipi_res_per_s | obs_vol_ctxt_per_s | obs_cpu_ms_per_s | ts_Pkg%pc6 | ts_PkgWatt |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| adaptive | 5 | -0.106 ± 0.101* | -0.029 ± 0.013* | 0.028 ± 0.036 | 0.087 ± 0.090 | 0.007 ± 0.148 | 0.242 ± 0.157* | -62.406 ± 56.495* | -60.565 ± 54.534* | -32.934 ± 15.704* | -0.122 ± 0.196 | -0.231 ± 0.220* | 0.001 ± 0.002 | 0.000 ± 0.001 | 0.242 ± 0.156* | -0.105 ± 0.103* |
+| ebpf_1 | 5 | -0.008 ± 0.229 | 0.004 ± 0.069 | 0.015 ± 0.088 | 0.048 ± 0.226 | 0.148 ± 0.286 | -0.111 ± 0.490 | -32.178 ± 145.015 | -31.831 ± 142.473 | -8.784 ± 61.748 | -0.114 ± 0.313 | -0.131 ± 0.508 | 0.999 ± 0.002* | 0.208 ± 0.001* | -0.111 ± 0.489 | -0.008 ± 0.226 |
+| ebpf_2 | 5 | 0.048 ± 0.379 | -0.009 ± 0.071 | -0.006 ± 0.123 | -0.009 ± 0.335 | 0.126 ± 0.198 | -0.262 ± 0.751 | 4.591 ± 223.661 | 3.726 ± 217.405 | 2.396 ± 108.102 | 0.066 ± 0.671 | -0.015 ± 0.763 | 0.500 ± 0.002* | 0.105 ± 0.000* | -0.261 ± 0.756 | 0.047 ± 0.377 |
+| ebpf_4 | 5 | -0.170 ± 0.125* | -0.018 ± 0.033 | 0.067 ± 0.036* | 0.189 ± 0.098* | 0.158 ± 0.106* | 0.217 ± 0.298 | -118.983 ± 69.930* | -115.985 ± 67.043* | -29.699 ± 47.119 | -0.631 ± 0.755 | -0.486 ± 0.282* | 0.250 ± 0.002* | 0.054 ± 0.000* | 0.218 ± 0.294 | -0.172 ± 0.124* |
+| fixed_1 | 5 | 0.113 ± 0.359 | -0.002 ± 0.054 | -0.033 ± 0.129 | -0.090 ± 0.343 | 0.024 ± 0.258 | -0.249 ± 0.575 | 60.598 ± 223.537 | 54.746 ± 216.314 | 29.656 ± 96.233 | 0.093 ± 0.643 | 0.241 ± 0.885 | 2.934 ± 0.186* | 0.224 ± 0.003* | -0.247 ± 0.577 | 0.113 ± 0.358 |
+| fixed_2 | 5 | -0.145 ± 0.069* | -0.039 ± 0.024* | 0.051 ± 0.002* | 0.138 ± 0.015* | 0.156 ± 0.223 | 0.165 ± 0.417 | -91.348 ± 16.803* | -90.504 ± 16.848* | -37.420 ± 30.088* | -0.168 ± 0.043* | -0.332 ± 0.085* | 1.400 ± 0.279* | 0.111 ± 0.003* | 0.166 ± 0.413 | -0.144 ± 0.071* |
+| fixed_4 | 5 | 0.166 ± 0.360 | 0.012 ± 0.039 | -0.043 ± 0.104 | -0.121 ± 0.287 | 0.004 ± 0.266 | -0.353 ± 0.723 | 82.017 ± 187.916 | 79.060 ± 183.425 | 45.407 ± 72.691 | 0.180 ± 0.520 | 0.254 ± 0.680 | 0.749 ± 0.000* | 0.058 ± 0.002* | -0.354 ± 0.726 | 0.164 ± 0.361 |
+| node_exporter | 5 | 0.295 ± 0.183* | 0.117 ± 0.027* | -0.057 ± 0.046* | -0.049 ± 0.131 | 0.721 ± 0.154* | -1.597 ± 0.437* | 87.610 ± 87.865 | 36.101 ± 85.417 | 266.475 ± 52.055* | 3.934 ± 0.882* | -0.261 ± 0.284 | 86.154 ± 4.177* | 11.567 ± 0.229* | -1.596 ± 0.434* | 0.296 ± 0.181* |
+
+## Dose-response (observer sample rate -> package power)
+
+Rates in the fit: 0, 0.25, 0.5, 1 Hz. Slope is the energy cost of one observer sample (timer wake plus the remote wakeups it causes).
+
+| response | intercept | slope per Hz | 95% CI | R² | runs |
+|---|---|---|---|---|---|
+| pkg_W | 25.533 | -23.929 mW/Hz = mJ/sample | ± 87.197 (n.s.) | 0.00 | 80 |
+| core_c6_pct | 99.618 | 0.039 %-points/Hz | ± 0.077 (n.s.) | 0.01 | 80 |
+| idle_entries_per_s | 391.858 | -26.271 entries/s per Hz | ± 50.377 (n.s.) | 0.01 | 80 |
+
+Check linearity before trusting the slope: compare fits with `--max-rate` set to the lower and upper half of the rates.
+
+_Trace-pass metrics (`idle_exit_*`) come from a separate perturbing bpftrace window and are not comparable to power numbers._
+
