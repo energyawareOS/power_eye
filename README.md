@@ -219,6 +219,7 @@ Options:
 A monitor is itself a load: every sample wakes a CPU, and a sysfs `energy_uj` read also wakes a CPU of each package by IPI. On the test server (2x Xeon E5-2650 v4, package C6 enabled) one sample cost about 15 mJ, below detection at 1 Hz and visible at 100 Hz. `-B` removes the remote wakeups and `-A` reduces the own wakeups when the system is idle.
 
 - `tools/bench`: A/B harness with a non-perturbing reference measurement (counters read only at the window start and end), paired statistics, dose-response regression, a five-condition runner (`run_conditions.sh`) and raw CSV export. See [tools/bench/README.md](tools/bench/README.md).
+- `tools/report`: `plot_report.py` draws the three report figures (observer cost per condition, adaptive interval with coma detection, extra power against sample rate) from the committed results. Run `python3 tools/report/plot_report.py` from the repository root (needs matplotlib); it writes PNG and SVG plus the plotted numbers as CSV to `results/report/`. Options: `--out`, `--format png,svg`, `--root`. The figures have no titles or captions.
 - `tools/bpf-feasibility`, `tools/bpf-prototype`: probes and the standalone idle-exit sampler that `-B` is based on.
 - `results/coma-long`: a 90 minute run with `-A` and `-C`, and `results/compiled`: the data compiled from the experiments so far (`env.txt` explains where each row comes from; adaptive and node_exporter are not yet measured under the same conditions as the others).
 
